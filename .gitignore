@@ -1,5 +1,8 @@
 # Prerequisites
 *.d
+*.pyc
+./build/*
+./devel/*
 
 # Compiled Object files
 *.slo

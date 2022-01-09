@@ -1,0 +1,12 @@
+float64 joint_1
+float64 joint_2
+float64 joint_3
+float64 joint_4
+float64 joint_5
+float64 joint_6
+float64 joint_7
+float64 joint_8
+float64 joint_9
+float64 joint_10
+float64 joint_11
+float64 joint_12
