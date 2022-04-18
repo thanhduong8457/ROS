@@ -1,13 +1,7 @@
 import math
 import delta_define
 import numpy as np
-from numpy.linalg import inv
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
-###############################################
-########### [Parametros] ######################
-###############################################
 mtmm = delta_define.mtmm()
 mmtm = delta_define.mmtm()
 
@@ -19,6 +13,7 @@ mmtm = delta_define.mmtm()
 # vmax [metros/segundos]
 # amax [metros / segundos^2]
 # pas 1 y pas 2 son numero enteros
+
 def ls_v_a_total(q0, q1, vmax, amax, pas_1, pas_2):
  ####### {{{ Cambio unidades SI }}} ##################
  q0 *= mmtm
@@ -130,9 +125,11 @@ def ls_v_a_puntual(q0, q1, vmax, amax, tactual):
  tau = vmax / amax
  s = np.sign((q1 - q0))
  T = (s * (((q1) - (q0)) / (vmax))) + (tau)
+
  tramo1 = tau
  tramo2 = T - tau
  tramo3 = T
+
  if ((0 <= tactual) and (tactual <= tramo1)):
   q_actual = (q0) + ((s) * (amax / 2) * (tactual ** 2))
   v_actual = s * amax * tactual

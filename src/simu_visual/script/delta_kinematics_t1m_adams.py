@@ -27,13 +27,6 @@ mtmm=delta_define.mtmm()
 mmtm=delta_define.mmtm()
 rtd= delta_define.rtd()
 
-###############################################
-####### [ Cinematica Directa ] ################
-###############################################
-
-# ******************************************
-# ****** {{{ Directa }}} *******************
-# ******************************************
 def forward(theta1,theta2,theta3):
    theta1*=dtr
    theta2*=dtr
@@ -78,7 +71,7 @@ def forward(theta1,theta2,theta3):
    # discriminante
    d=b*b-4.0*a*c
    if d<0.0:
-      print("discriminante - directo error")
+      print("discriminant - direct error")
       return [1,0,0,0]
 
    z0=-0.5*(b+math.sqrt(d))/a
@@ -93,10 +86,6 @@ def forward(theta1,theta2,theta3):
 ###############################################
 ####### [ Cinematica Inversa ] ################
 ###############################################
-
-# ******************************************
-# ****** {{{ Inversa }}} *******************
-# ******************************************
 def inverse(x0,y0,z0):
    y0*=mmtm
    x0*=mmtm

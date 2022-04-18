@@ -1,19 +1,12 @@
 import math
 import delta_define
 import numpy as np
-from numpy.linalg import inv
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 rtd = delta_define.rtd()
 mmtm = delta_define.mmtm()
 mtmm = delta_define.mtmm()
 dtr = delta_define.dtr()
-
-
-###############################################
-##### [ Direct Translation and Rotation ] #######
-###############################################
 
 def path_linear_speed(xo, yo, zo, xf, yf, zf):
   ######  International units change  ##########
@@ -72,9 +65,9 @@ def system_linear(xo, yo, zo, xf, yf, zf):  # ,theta_z,theta_y) :
 
   ######  Rotacion Z  ######
   # Plano xy ya trasladado
-  pf[0, 0] = x_trans[0, 0]
-  pf[1, 0] = x_trans[1, 0]
-  pf[2, 0] = x_trans[2, 0]
+  pf[0, 0] = x_trans[0, 0]  # xf - x0
+  pf[1, 0] = x_trans[1, 0]  # yf - y0
+  pf[2, 0] = x_trans[2, 0]  # zf - z0
   # Rotacion respecto a eje Z
   rot_z[0, 0] = cos_axisz
   rot_z[0, 1] = sin_axisz
@@ -138,13 +131,6 @@ def angulos_rot(nx, ny, nz):
   return [theta_z, theta_y]
 
 
-###############################################
-##### [ Traslacion y Rotacion Inversa ] #######
-###############################################
-
-# ******************************************
-# ******  Funcion Principal  *********
-# ******************************************
 def path_linear_speed_inv(m_tiempo, m_pos, m_vel, m_acel, rot_z, rot_y, theta_y, theta_z, m_trans):
   ######  Cambiar unidades a SI  ##########
   m_tiempo = m_tiempo[0]
@@ -163,52 +149,52 @@ def path_linear_speed_inv(m_tiempo, m_pos, m_vel, m_acel, rot_z, rot_y, theta_y,
 # ****  Trayectoria Lineal XYZ  ******
 # ******************************************
 def system_linear_matrix(m_tiempo, m_pos, m_vel, m_acel, rot_z, rot_y, theta_y, theta_z, m_trans):
- tamano = len(m_tiempo)
- ######  Crear Matrices  ##########
- m_pos_x = np.zeros((1, tamano))
- m_pos_y = np.zeros((1, tamano))
- m_pos_z = np.zeros((1, tamano))
- m_vel_x = np.zeros((1, tamano))
- m_vel_y = np.zeros((1, tamano))
- m_vel_z = np.zeros((1, tamano))
- m_acel_x = np.zeros((1, tamano))
- m_acel_y = np.zeros((1, tamano))
- m_acel_z = np.zeros((1, tamano))
- for i in range(0, tamano):
-  ######  Posicion xyz  ##########
-  xyz_ls = system_linear_inv(m_pos[i],
-   rot_z, rot_y,
-   theta_y, theta_z,
-   m_trans)
-  m_pos_x[0, i] = xyz_ls[0, 0]
-  m_pos_y[0, i] = xyz_ls[1, 0]
-  m_pos_z[0, i] = xyz_ls[2, 0]
-  ######  Velocidad xyz  ##########
-  xyz_ls_vel = system_linear_inv(m_vel[i],
-   rot_z, rot_y,
-   theta_y, theta_z,
-   m_trans)
-  m_vel_x[0, i] = xyz_ls_vel[0, 0]
-  m_vel_y[0, i] = xyz_ls_vel[1, 0]
-  m_vel_z[0, i] = xyz_ls_vel[2, 0]
-  ######  Aceleracion xyz  ##########
-  xyz_ls_acel = system_linear_inv(m_acel[i],
-   rot_z, rot_y,
-   theta_y, theta_z,
-   m_trans)
-  m_acel_x[0, i] = xyz_ls_acel[0, 0]
-  m_acel_y[0, i] = xyz_ls_acel[1, 0]
-  m_acel_z[0, i] = xyz_ls_acel[2, 0]
- return [m_tiempo,
-		 mtmm * m_pos_x[0], mtmm * m_pos_y[0], mtmm * m_pos_z[0],
-		 mtmm * m_vel_x[0], mtmm * m_vel_y[0], mtmm * m_vel_z[0],
-		 mtmm * m_acel_x[0], mtmm * m_acel_y[0], mtmm * m_acel_z[0]]
+
+  tamano = len(m_tiempo)
+
+  m_pos_x = np.zeros((1, tamano))
+  m_pos_y = np.zeros((1, tamano))
+  m_pos_z = np.zeros((1, tamano))
+
+  m_vel_x = np.zeros((1, tamano))
+  m_vel_y = np.zeros((1, tamano))
+  m_vel_z = np.zeros((1, tamano))
+
+  m_acel_x = np.zeros((1, tamano))
+  m_acel_y = np.zeros((1, tamano))
+  m_acel_z = np.zeros((1, tamano))
+
+  for i in range(0, tamano):
+    ######  Posicion xyz  ##########
+    xyz_ls = system_linear_inv(m_pos[i], rot_z, rot_y, theta_y, theta_z, m_trans)
+
+    m_pos_x[0, i] = xyz_ls[0, 0]
+    m_pos_y[0, i] = xyz_ls[1, 0]
+    m_pos_z[0, i] = xyz_ls[2, 0]
+
+    ######  Velocidad xyz  ##########
+    xyz_ls_vel = system_linear_inv(m_vel[i],rot_z, rot_y,theta_y, theta_z, m_trans)
+    m_vel_x[0, i] = xyz_ls_vel[0, 0]
+    m_vel_y[0, i] = xyz_ls_vel[1, 0]
+    m_vel_z[0, i] = xyz_ls_vel[2, 0]
+
+    ######  Aceleracion xyz  ##########
+    xyz_ls_acel = system_linear_inv(m_acel[i],rot_z, rot_y,theta_y, theta_z,m_trans)
+    m_acel_x[0, i] = xyz_ls_acel[0, 0]
+    m_acel_y[0, i] = xyz_ls_acel[1, 0]
+    m_acel_z[0, i] = xyz_ls_acel[2, 0]
+  
+  return [m_tiempo,
+      mtmm * m_pos_x[0], mtmm * m_pos_y[0], mtmm * m_pos_z[0],
+      mtmm * m_vel_x[0], mtmm * m_vel_y[0], mtmm * m_vel_z[0],
+      mtmm * m_acel_x[0], mtmm * m_acel_y[0], mtmm * m_acel_z[0]]
 
 
 # ******************************************
 # ******  Rotacion Inversa ***********
 # ******************************************
 def system_linear_inv(xprima, rot_z, rot_y, theta_y, theta_z, m_trans):
+  
  ######   Creacion de Matrices  ######
  rot_tras_inv = np.zeros((4, 4))
  pf_inv = np.zeros((3, 1))
@@ -243,22 +229,5 @@ def system_linear_inv(xprima, rot_z, rot_y, theta_y, theta_z, m_trans):
  m_trans_inv[3, 3] = 1
 
  xyz_res = (m_trans_inv).dot(pf_trans_inv)
+
  return xyz_res
-
-
-# ******************************************
-# ***  Plot trayectoria linear XYZ ***
-# ******************************************
-def plot_ls(x_m, y_m, z_m):
- fig = plt.figure()
- lsx = fig.add_subplot(111, projection='3d')
- lsx.scatter3D(x_m, y_m, z_m, c=z_m, cmap='hsv')
- lsx.set_xlabel('X [mm]')
- lsx.set_ylabel('Y [mm]')
- lsx.set_zlabel('Z [mm]')
- lsx.set_title('Linear Speed')
- lsx.text(x_m[0], y_m[0], z_m[0], "Inicio", color='red')
- plt.ion()
- plt.show()
- plt.pause(0.1)
- plt.ioff()

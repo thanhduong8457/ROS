@@ -1,13 +1,10 @@
 #!/usr/bin/env python
 import delta_define
 import codos_tm1_adams
-import roslib
 import rospy
 import std_msgs.msg
 
 from sensor_msgs.msg import JointState
-from simu_visual.msg import angulo
-from simu_visual.msg import posicionxyz
 from simu_visual.msg import matriz_path_ls
 
 pi = delta_define.pi()
@@ -42,7 +39,6 @@ def node():
     rospy.Subscriber("m_txyzth123", matriz_path_ls, callback)
 
     while not rospy.is_shutdown():
-
         if permiso == True and id_call != id_permiso:
             rospy.loginfo("Creating Linear Path RVIZ!")
             largo = len(t_m)
@@ -68,9 +64,7 @@ def node():
 # |--------------------------------------|
 # |----------- Joint Angles -----------| 
 # |--------------------------------------|
-def angulos_eulerianos(ti,
-                       xi, yi, zi,
-                       th1, th2, th3):
+def angulos_eulerianos(ti, xi, yi, zi, th1, th2, th3):
     # Rviz interior angles in Radians
     joint = JointState()
     punto = [-yi * mmtm, -xi * mmtm, -zi * mmtm]
@@ -94,11 +88,11 @@ def angulos_eulerianos(ti,
     joint.header = std_msgs.msg.Header()
     joint.header.stamp = rospy.Time.now()
 
-    joint.name = ["base_brazo1", "base_brazo2", "base_brazo3",
-                  "codo1_a", "codo1_b",
-                  "codo2_a", "codo2_b",
-                  "codo3_a", "codo3_b",
-                  "act_x", "act_y", "act_z"]
+    joint.name = ["base_brazo1",    "base_brazo2",  "base_brazo3",
+                  "codo1_a",        "codo1_b",
+                  "codo2_a",        "codo2_b",
+                  "codo3_a",        "codo3_b",
+                  "act_x",          "act_y",         "act_z"]
 
     joint.position = [th1 * dtr, th2 * dtr, th3 * dtr,
                       th1 * dtr + a1_a, a1_b,
