@@ -20,7 +20,8 @@ def sendData(se, data, digits):
         print("Data Transmition Failed")
 
 if __name__ == "__main__":
-    ser = initConnection('COM8', 9600)
+    ser = initConnection('/dev/COM8', 9600)
     while True:
         sendData(ser, [50,255], 3)
         time.sleep(1)
+

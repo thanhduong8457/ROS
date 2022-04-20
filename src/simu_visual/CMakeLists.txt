@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   genmsg
   urdf
+  serial
 )
 
 ## System dependencies are found with CMake's conventions
@@ -132,6 +133,9 @@ add_executable(position src/position.cpp)
 target_link_libraries(position ${catkin_LIBRARIES})
 add_dependencies(position simu_visual_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
 
+add_executable(serial_module src/serial_module.cpp)
+target_link_libraries(serial_module ${catkin_LIBRARIES})
+add_dependencies(serial_module simu_visual_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
