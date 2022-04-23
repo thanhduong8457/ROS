@@ -132,21 +132,21 @@ def angle_yz(x0,y0,z0,theta=None):
    zj=a+b*yj
 
    if ((y1-yj)!=0.0):
-	theta=math.atan(((-1)*(zj))/(abs(y1-yj)))
-  	if (yj<y1):
-		theta=theta*(rtd)
-  	else:
-		if zj<0:
-			theta=theta*(180.0/pi)
-			theta=180.0-theta
-		else:
-			theta=theta*(180.0/pi)
-			theta=(-1.0*180.0)+theta
+      theta=math.atan(((-1)*(zj))/(abs(y1-yj)))
+      if (yj<y1):
+         theta=theta*(rtd)
+      else:
+         if zj<0:
+            theta=theta*(180.0/pi)
+            theta=180.0-theta
+         else:
+            theta=theta*(180.0/pi)
+            theta=(-1.0*180.0)+theta
    else:
-	if zj<0:
-		theta=90.0
-	else:
-		theta=-90.0
+      if zj<0:
+         theta=90.0
+      else:
+         theta=-90.0
 
    return [0,theta]
 

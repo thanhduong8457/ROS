@@ -129,9 +129,9 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-add_executable(position src/position.cpp)
-target_link_libraries(position ${catkin_LIBRARIES})
-add_dependencies(position simu_visual_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
+add_executable(test_serial src/test_serial.cpp)
+target_link_libraries(test_serial ${catkin_LIBRARIES})
+add_dependencies(test_serial simu_visual_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
 
 add_executable(serial_module src/serial_module.cpp)
 target_link_libraries(serial_module ${catkin_LIBRARIES})

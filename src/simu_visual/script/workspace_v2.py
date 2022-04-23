@@ -98,7 +98,7 @@ def espaciotrabajo(deltaangulo):
   for theta12 in range(res_ang_min, res_ang_max, deltaangulo):
    for theta13 in range(res_ang_min, res_ang_max, deltaangulo):
 	####### {{{ Cinematica Directa }}} ######
-	Pnew = delta_kinematics_t1m_adams.forward(theta12, theta13, theta11)
+	Pnew = delta_kinematics_t1m_adams.(theta12, theta13, theta11)
 
 	# Punto a Guardar proximamente
 	px = Pnew[1]  # [mm]

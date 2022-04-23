@@ -3,33 +3,31 @@ import math
 #Geometric Dimensioning Robot Delta
 
 def l2():
- value = (880.0) * ((10.0) ** (-3))  # Longitud Antebrazo [m]
+ value = (465.0) * ((10.0) ** (-3))  # Longitud Antebrazo [m]
  return value
 
 
 def l1():
- value = (620.0) * ((10.0) ** (-3))  # Longitud Brazo [m]
+ value = (200.0) * ((10.0) ** (-3))  # Longitud Brazo [m]
  return value
-
-
-def rb():
- value = (50.0) * ((10.0) ** (-3))  # Radio plataforma movil[m]
- return value
-
-
-def ra():
- value = (210.0) * ((10.0) ** (-3))  # Radio base fija [m]
- return value
-
 
 def e():
- value = (2.0 * rb()) / (tan30())  # [m]
+ value = (86.5) * ((10.0) ** (-3))  # [m]
  return value
 
 
 def f():
- value = (2.0 * ra()) / (tan30())  # [m]
+ value = (346.4) * ((10.0) ** (-3))  # [m]
  return value
+
+def rb():
+ value = e() * tan30/2  # Radio plataforma movil[m]
+ return value
+
+def ra():
+ value = f() * tan30/2# Radio base fija [m]
+ return value
+
 
 
 def hf():

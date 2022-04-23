@@ -143,65 +143,65 @@ def inverse_Paderborn(p0x, p0y, p0z):
 # ****** {{{ Plano YZ }}} ******************
 # ******************************************
 def angle_yz_Paderborn(p0x, p0y, p0z, theta=None):
- f2y = -1 * (f / (2 * math.sqrt(3)))
+  f2y = -1 * (f / (2 * math.sqrt(3)))
 
- # Centros y Radios de los 2 circulos
- h1 = (p0y) - ((e) / (2 * math.sqrt(3)))
- k1 = p0z
- h2 = f2y
- k2 = 0
- R1 = math.sqrt(((re) ** 2) - ((p0x) ** 2))
- R2 = (rf)
- dist_centros = math.sqrt(((h1 - h2) ** 2) + ((k1 - k2) ** 2))
+  # Centros y Radios de los 2 circulos
+  h1 = (p0y) - ((e) / (2 * math.sqrt(3)))
+  k1 = p0z
+  h2 = f2y
+  k2 = 0
+  R1 = math.sqrt(((re) ** 2) - ((p0x) ** 2))
+  R2 = (rf)
+  dist_centros = math.sqrt(((h1 - h2) ** 2) + ((k1 - k2) ** 2))
 
- # Casos de interseccion
- if dist_centros > R1 + R2:
-  print("non intersecting KI")
-  return [1, 0]
- elif dist_centros < abs(R1 - R2):
-  print("One circle within other KI")
-  return [1, 0]
- elif dist_centros == 0 and R1 == R2:
-  print("coincident circles KI")
-  return [1, 0]
- else:
-  a = (R1 ** 2 - R2 ** 2 + dist_centros ** 2) / (2 * dist_centros)
-  h = math.sqrt(R1 ** 2 - a ** 2)
-
-  x2 = h1 + a * (h2 - h1) / dist_centros
-  y2 = k1 + a * (k2 - k1) / dist_centros
-
-  x3 = x2 + h * (k2 - k1) / dist_centros
-  y3 = y2 - h * (h2 - h1) / dist_centros
-
-  x4 = x2 - h * (k2 - k1) / dist_centros
-  y4 = y2 + h * (h2 - h1) / dist_centros
- # Intersection (x3, y3) (x4, y4)
-
- if x3 < x4:
-  j2y = x3
-  j2z = y3
- else:
-  j2y = x4
-  j2z = y4
-
- if (f2y - j2y) != 0:
-  theta = math.atan(((-1) * (j2z)) / (abs(f2y - j2y)))
-  if (j2y < f2y):
-   theta = theta * (180.0 / pi)
+  # Casos de interseccion
+  if dist_centros > R1 + R2:
+    print("non intersecting KI")
+    return [1, 0]
+  elif dist_centros < abs(R1 - R2):
+    print("One circle within other KI")
+    return [1, 0]
+  elif dist_centros == 0 and R1 == R2:
+    print("coincident circles KI")
+    return [1, 0]
   else:
-   if j2z < 0:
-	theta = theta * (180.0 / pi)
-	theta = 180 - theta
-   else:
-	theta = theta * (180.0 / pi)
-	theta = (-1 * 180) + theta
- else:
-  if j2z < 0:
-   theta = 90
+    a = (R1 ** 2 - R2 ** 2 + dist_centros ** 2) / (2 * dist_centros)
+    h = math.sqrt(R1 ** 2 - a ** 2)
+
+    x2 = h1 + a * (h2 - h1) / dist_centros
+    y2 = k1 + a * (k2 - k1) / dist_centros
+
+    x3 = x2 + h * (k2 - k1) / dist_centros
+    y3 = y2 - h * (h2 - h1) / dist_centros
+
+    x4 = x2 - h * (k2 - k1) / dist_centros
+    y4 = y2 + h * (h2 - h1) / dist_centros
+    # Intersection (x3, y3) (x4, y4)
+
+  if x3 < x4:
+    j2y = x3
+    j2z = y3
   else:
-   theta = -90
- return [0, theta]  # error
+    j2y = x4
+    j2z = y4
+
+  if (f2y - j2y) != 0:
+    theta = math.atan(((-1) * (j2z)) / (abs(f2y - j2y)))
+    if (j2y < f2y):
+      theta = theta * (180.0 / pi)
+    else:
+      if j2z < 0:
+        theta = theta * (180.0 / pi)
+        theta = 180 - theta
+      else:
+        theta = theta * (180.0 / pi)
+        theta = (-1 * 180) + theta
+  else:
+    if j2z < 0:
+      theta = 90
+    else:
+      theta = -90
+  return [0, theta]  # error
 
 
 # ******************************************
