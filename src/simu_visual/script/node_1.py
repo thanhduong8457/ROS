@@ -20,18 +20,14 @@ def node():
 
    global call_vmax_2
    global call_amax_2
-
-   global call_pas1_2
-   global call_pas2_2
    
    global permiso_2
-   global id_call_2
-   global num_tray_2
 
    #######  Variables verify incoming message  #######
+   call_pas1_2 = 50
+   call_pas2_2 = 150
+
    permiso_2 = False
-   id_call_2 = 0
-   id_permiso_2 = 0
 
    #######  Start ROS node  ##################
    rospy.init_node("torque_metodo_1", anonymous=False)
@@ -42,10 +38,9 @@ def node():
    rospy.Subscriber("input_ls_final", linear_speed_xyz, callback_linear_speed_xyz) # Topics
 
    while not rospy.is_shutdown():
+      if ((permiso_2 == True) and ((call_xo_2 != call_xf_2) or (call_yo_2 != call_yf_2) or (call_zo_2 != call_zf_2)) and ((call_vmax_2 > 0) and (call_amax_2 > 0))):
 
-      if ((permiso_2 == True) and (id_call_2 != id_permiso_2) and ((call_xo_2 != call_xf_2) or (call_yo_2 != call_yf_2) or (call_zo_2 != call_zf_2)) and ((call_vmax_2 > 0) and (call_amax_2 > 0))):
-
-         rospy.loginfo("ID: " + str(id_call_2) + "  v_max= " + str(call_vmax_2) + "  a_max=" + str(call_amax_2))
+         rospy.loginfo("  v_max= " + str(call_vmax_2) + "  a_max=" + str(call_amax_2))
 
          #######   End and start point rotation  #######
          results_2 = trans_rot_ls_adams.path_linear_speed(call_xo_2, call_yo_2, call_zo_2, call_xf_2, call_yf_2, call_zf_2)
@@ -62,9 +57,6 @@ def node():
          #######   Save in Matrix Path Cartesian space XYZ  #######
          res_1=[results_4[0],results_4[1],results_4[4],results_4[7],results_4[2],results_4[5],results_4[8],results_4[3],results_4[6],results_4[9]]
                #mytempo      x                
-         # ************************************
-         # ******  Method A *******************
-         # ************************************
 
          #######   Inverse kinematics  #######
          res_2 = delta_kinematics_t1m_adams.inverse_m(res_1[1], res_1[4], res_1[7])
@@ -81,50 +73,42 @@ def node():
          enviar.th3 = res_2[2]
 
          enviar.tiempo = res_1[0] * 10.0
-         enviar.permiso = bool(1)
-         enviar.id_call = random.randrange(10)
 
          pub1.publish(enviar)
          #######  Rviz Trajectory Visualization #######
 
          permiso_2 = False
-         id_permiso_2 = id_call_2
 
       rate.sleep()
 
    return
 
-
 def callback_linear_speed_xyz(data):
    global permiso_2
-   global id_call_2
+
    global call_xo_2
    global call_yo_2
    global call_zo_2
+
    global call_xf_2
    global call_yf_2
    global call_zf_2
+
    global call_vmax_2
    global call_amax_2
-   global call_pas1_2
-   global call_pas2_2
-   global num_tray_2
+
+   permiso_2 = True
 
    call_xo_2 = data.xo
    call_yo_2 = data.yo
    call_zo_2 = data.zo
+   
    call_xf_2 = data.xf
    call_yf_2 = data.yf
    call_zf_2 = data.zf
 
    call_vmax_2 = data.vmax
    call_amax_2 = data.amax
-   call_pas1_2 = data.paso1
-   call_pas2_2 = data.paso2
-
-   permiso_2 = data.ls_fin
-   id_call_2 = data.idcall
-   num_tray_2 = data.num_tray
 
 if __name__ == "__main__":
    try:

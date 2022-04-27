@@ -45,11 +45,13 @@ void show_infor()
   float theta_2 = my_joint[1]->position*180/pi;
   float theta_3 = my_joint[2]->position*180/pi;
 
+  int gripper = 1;
+
   data_send.data = "{\"theta1\":\"" + to_string(theta_1) +
                     "\",\"theta2\":\"" + to_string(theta_2) +
-                    "\",\"theta3\":\"" + to_string(theta_3) + "\"}\r\n";
+                    "\",\"theta3\":\"" + to_string(theta_3) + "\",\"gripper\":\"" + to_string(gripper) + "\"}\n";
 
-  ser.write(data_send.data);
+  ser.write(data_send.data); 
 
   cout<<data_send.data;
 }
@@ -76,7 +78,7 @@ int main(int argc, char** argv)
 
   try
   {
-    ser.setPort("/dev/ttyS8");
+    ser.setPort("/dev/ttyS6");
     ser.setBaudrate(115200);
     serial::Timeout to = serial::Timeout::simpleTimeout(1000);
     ser.setTimeout(to);

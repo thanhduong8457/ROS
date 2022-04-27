@@ -6,8 +6,3 @@ float32 yf
 float32 zf
 float32 vmax
 float32 amax
-int64 paso1
-int64 paso2
-bool ls_fin
-int64 idcall
-int64 num_tray

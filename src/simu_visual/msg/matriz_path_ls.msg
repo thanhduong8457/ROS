@@ -1,5 +1,3 @@
-bool permiso
-int64 id_call
 float32[] x
 float32[] y
 float32[] z

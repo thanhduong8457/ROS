@@ -14,7 +14,6 @@ mmtm = delta_define.mmtm()
 def node():
     ######  Callback Receive data  ######
     global permiso
-    global id_call
     global x_m
     global y_m
     global z_m
@@ -25,8 +24,6 @@ def node():
 
     juntas = JointState()
     permiso = False
-    id_call = 0
-    id_permiso = 0
 
     ######  Home Node  ######
     rospy.init_node("positioner_rviz_realtime_tm1", anonymous=False)
@@ -39,7 +36,7 @@ def node():
     rospy.Subscriber("m_txyzth123", matriz_path_ls, callback)
 
     while not rospy.is_shutdown():
-        if permiso == True and id_call != id_permiso:
+        if permiso == True:
             rospy.loginfo("Creating Linear Path RVIZ!")
             largo = len(t_m)
 
@@ -57,7 +54,6 @@ def node():
 
             #######  Reset variable incoming message  ######
             permiso = False
-            id_permiso = id_call
 
         rate.sleep()
 
@@ -106,11 +102,10 @@ def angulos_eulerianos(ti, xi, yi, zi, th1, th2, th3):
     return joint
 
 # |---------------------------------------------|
-# |----------- Receive matrix data -----------| 
+# |----------- Receive matrix data -------------| 
 # |---------------------------------------------|
 def callback(data):
     global permiso
-    global id_call
     global x_m
     global y_m
     global z_m
@@ -119,8 +114,7 @@ def callback(data):
     global theta3_m
     global t_m
 
-    permiso = data.permiso
-    id_call = data.id_call
+    permiso = True
     x_m = data.x
     y_m = data.y
     z_m = data.z
