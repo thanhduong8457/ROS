@@ -3,6 +3,7 @@ import delta_define
 import codos_tm1_adams
 import rospy
 import std_msgs.msg
+from std_msgs.msg import String
 
 from sensor_msgs.msg import JointState
 from simu_visual.msg import matriz_path_ls
@@ -31,6 +32,7 @@ def node():
 
     ######  Publisher  ######
     pub = rospy.Publisher("joint_states", JointState, queue_size=10)
+    pub_1 = rospy.Publisher("status_delta", String, queue_size=10)
 
     ######  Topics  ######
     rospy.Subscriber("m_txyzth123", matriz_path_ls, callback)
@@ -54,6 +56,8 @@ def node():
 
             #######  Reset variable incoming message  ######
             permiso = False
+            status_delta = "True"
+            pub_1.publish(status_delta)
 
         rate.sleep()
 

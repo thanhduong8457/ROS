@@ -69,7 +69,7 @@ void MoveGroupCallback(const sensor_msgs::JointState::ConstPtr& msg)
 int main(int argc, char** argv)
 {
   init_joint();
-	ros::init(argc, argv, "simu_visual");
+	ros::init(argc, argv, "serial_module");
 
 	ros::NodeHandle nh;
 
@@ -78,7 +78,7 @@ int main(int argc, char** argv)
 
   try
   {
-    ser.setPort("/dev/ttyS6");
+    ser.setPort("/dev/ttyS7");
     ser.setBaudrate(115200);
     serial::Timeout to = serial::Timeout::simpleTimeout(1000);
     ser.setTimeout(to);
@@ -118,8 +118,8 @@ int main(int argc, char** argv)
 
     chatter_pub.publish(PositionArm);
 
-    ros::spinOnce();
     loop_rate.sleep();
+    ros::spinOnce();
   }
   
   //ros::spin();
