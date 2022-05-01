@@ -110,21 +110,27 @@ def angulos_eulerianos(ti, xi, yi, zi, th1, th2, th3):
 # |---------------------------------------------|
 def callback(data):
     global permiso
+
     global x_m
     global y_m
     global z_m
+
     global theta1_m
     global theta2_m
     global theta3_m
+
     global t_m
 
     permiso = True
+
     x_m = data.x
     y_m = data.y
     z_m = data.z
+
     theta1_m = data.th1
     theta2_m = data.th2
     theta3_m = data.th3
+
     t_m = data.tiempo
 
 if __name__ == "__main__":

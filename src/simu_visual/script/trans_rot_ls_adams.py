@@ -184,11 +184,8 @@ def system_linear_matrix(m_tiempo, m_pos, m_vel, m_acel, rot_z, rot_y, theta_y, 
     m_acel_y[0, i] = xyz_ls_acel[1, 0]
     m_acel_z[0, i] = xyz_ls_acel[2, 0]
   
-  return [m_tiempo,
-      mtmm * m_pos_x[0], mtmm * m_pos_y[0], mtmm * m_pos_z[0],
-      mtmm * m_vel_x[0], mtmm * m_vel_y[0], mtmm * m_vel_z[0],
-      mtmm * m_acel_x[0], mtmm * m_acel_y[0], mtmm * m_acel_z[0]]
-
+  return [m_tiempo, mtmm * m_pos_x[0], mtmm * m_pos_y[0], mtmm * m_pos_z[0], mtmm * m_vel_x[0], mtmm * m_vel_y[0], mtmm * m_vel_z[0], mtmm * m_acel_x[0], mtmm * m_acel_y[0], mtmm * m_acel_z[0]]
+  #          0             1                   2                  3                    4               5                   6                 7                     8                  9
 
 # ******************************************
 # ******  Rotacion Inversa ***********

@@ -55,8 +55,9 @@ def node():
                                                             #  mytempo           pos         vel          acel        rot_z         rot_y     theta_y         theta_z   rot_tras
 
          #######   Save in Matrix Path Cartesian space XYZ  #######
-         res_1=[results_4[0],results_4[1],results_4[4],results_4[7],results_4[2],results_4[5],results_4[8],results_4[3],results_4[6],results_4[9]]
-               #mytempo      x                
+         res_1=[results_4[0], results_4[1], results_4[4], results_4[7], results_4[2], results_4[5], results_4[8], results_4[3], results_4[6], results_4[9]]
+               #   mytempo        x            vel_x         acel_x           y          vel_y         acel_y         z          vel_z           acel_z
+               #     0            1              2             3              4            5              6           7            8                9
 
          #######   Inverse kinematics  #######
          res_2 = delta_kinematics_t1m_adams.inverse_m(res_1[1], res_1[4], res_1[7])
@@ -75,6 +76,7 @@ def node():
          enviar.tiempo = res_1[0] * 10.0
 
          pub1.publish(enviar)
+
          #######  Rviz Trajectory Visualization #######
 
          permiso_2 = False

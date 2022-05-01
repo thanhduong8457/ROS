@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     add_point(0.0, 0.0, -375.0);
     add_point(0.0, -150, -490.0);
     add_point(0.0, 0.0, -375.0);
-    add_point(100.0, 100.0, -450.0);
+    add_point(100.0, 100.0, -490.0);
     add_point(-100.0, -100.0, -490.0);
     add_point(0.0, 0.0, -490.0);
     add_point(0.0, 0.0, -375.0);
@@ -69,8 +69,8 @@ int main(int argc, char **argv)
             linear_speed_xyz.yf = my_point[1]->position_y;
             linear_speed_xyz.zf = my_point[1]->position_z;
 
-            linear_speed_xyz.vmax = 200.0;
-            linear_speed_xyz.amax = 10000.0;
+            linear_speed_xyz.vmax = 2000.0;
+            linear_speed_xyz.amax = 100000.0;
 
             loop_rate.sleep();
             chatter_pub.publish(linear_speed_xyz);

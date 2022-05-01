@@ -155,14 +155,16 @@ def angle_yz(x0,y0,z0,theta=None):
 # ******************************************
 def inverse_m(p0x_m,p0y_m,p0z_m):
 	tamano=len(p0x_m)
+
 	theta1_m=np.zeros((1,tamano))
 	theta2_m=np.zeros((1,tamano))
 	theta3_m=np.zeros((1,tamano))
+
 	for i in range(0,tamano):
 		theta_m=inverse(p0x_m[i],p0y_m[i],p0z_m[i])
 		#print(theta_m)
 		theta1_m[0,i]=theta_m[1]
 		theta2_m[0,i]=theta_m[2]
 		theta3_m[0,i]=theta_m[3]
-	return [theta1_m[0],theta2_m[0],theta3_m[0]]
 
+	return [theta1_m[0],theta2_m[0],theta3_m[0]]
