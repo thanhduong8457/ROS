@@ -30,22 +30,23 @@ def node():
 
     global permiso_2
 
-    juntas = JointState()
-
     ######  Home Node  ######
-    rospy.init_node("positioner_rviz_realtime_tm1", anonymous=False)
+    rospy.init_node("node_c", anonymous=False)
     rate = rospy.Rate(7.8125)  # Hz
+
+    #######  Publisher  ##################
+    rospy.Subscriber("input_ls_final", linear_speed_xyz, callback_linear_speed_xyz) # Topics
+
+    pub = rospy.Publisher("joint_states", JointState, queue_size=10)
+    pub_1 = rospy.Publisher("status_delta", String, queue_size=10)
+
+    juntas = JointState()
 
     #######  Variables verify incoming message  #######
     call_pas1_2 = 50
     call_pas2_2 = 150
 
     permiso_2 = False
-
-    #######  Publisher  ##################
-    rospy.Subscriber("input_ls_final", linear_speed_xyz, callback_linear_speed_xyz) # Topics
-    pub = rospy.Publisher("joint_states", JointState, queue_size=10)
-    pub_1 = rospy.Publisher("status_delta", String, queue_size=10)
 
     while not rospy.is_shutdown():
         if ((permiso_2 == True) and ((call_xo_2 != call_xf_2) or (call_yo_2 != call_yf_2) or (call_zo_2 != call_zf_2)) and ((call_vmax_2 > 0) and (call_amax_2 > 0))):
@@ -63,32 +64,16 @@ def node():
             ########   Reverse rotation end point, start point and trajectory #######
             results_4 = trans_rot_ls_adams.path_linear_speed_inv(results_3[0],results_3[1],results_3[2],results_3[3],results_2[1],results_2[2],results_2[3],results_2[4],results_2[5])
                                                             #  mytempo           pos         vel          acel        rot_z         rot_y     theta_y         theta_z   rot_tras
-
+            
             #######   Save in Matrix Path Cartesian space XYZ  #######
             res_1=[results_4[0], results_4[1], results_4[4], results_4[7], results_4[2], results_4[5], results_4[8], results_4[3], results_4[6], results_4[9]]
                 #   mytempo        x            vel_x         acel_x           y          vel_y         acel_y         z          vel_z           acel_z
                 #     0            1              2             3              4            5              6           7            8                9
-
+            
             #######   Inverse kinematics  #######
             res_2 = delta_kinematics_t1m_adams.inverse_m(res_1[1], res_1[4], res_1[7])
 
             #######  Rviz Trajectory Visualization #######
-            # enviar = matriz_path_ls()
-
-            # enviar.x = res_1[1]
-            # enviar.y = res_1[4]
-            # enviar.z = res_1[7]
-
-            # enviar.th1 = res_2[0]
-            # enviar.th2 = res_2[1]
-            # enviar.th3 = res_2[2]
-
-            # enviar.tiempo = res_1[0] * 10.0
-
-            # pub1.publish(enviar)
-
-            #######  Rviz Trajectory Visualization #######
-
             rospy.loginfo("Creating Linear Path RVIZ!")
             largo = len(res_1[0])
 
@@ -106,11 +91,10 @@ def node():
                 pub.publish(juntas)
 
             #######  Reset variable incoming message  ######
-            status_delta = "True"
+            status_delta = "DONE"
             pub_1.publish(status_delta)
 
             permiso_2 = False
-
 
         rate.sleep()
 

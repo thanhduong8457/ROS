@@ -129,9 +129,13 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-add_executable(run_time src/run_time.cpp)
-target_link_libraries(run_time ${catkin_LIBRARIES})
-add_dependencies(run_time simu_visual_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
+add_executable(node_b src/node_b.cpp)
+target_link_libraries(node_b ${catkin_LIBRARIES})
+add_dependencies(node_b simu_visual_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
+
+add_executable(node_a src/node_a.cpp)
+target_link_libraries(node_a ${catkin_LIBRARIES})
+add_dependencies(node_a simu_visual_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
 
 add_executable(serial_module src/serial_module.cpp)
 target_link_libraries(serial_module ${catkin_LIBRARIES})
