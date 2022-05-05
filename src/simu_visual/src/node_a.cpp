@@ -13,12 +13,20 @@ typedef struct point{
   double position_x;
   double position_y;
   double position_z;
+  int type;
 }point_t;
 
-vector<point_t *> my_point_a;
-bool status_a;
+enum{
+    circle = 1,
+    square,
+    triangle
+};
 
-void add_point(double x, double y, double z)
+vector<point_t *> my_point;
+bool status;
+bool is_exit;
+
+void add_point(double x, double y, double z, int type)
 {
     point_t *data = NULL;
     data = new point_t;
@@ -26,14 +34,21 @@ void add_point(double x, double y, double z)
     data->position_x = x;
     data->position_y = y;
     data->position_z = z;
+    data->type = type;
 
-    my_point_a.push_back(data);
+    my_point.push_back(data);
 }
 
 void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg)
 {
     ROS_INFO("status: [%s]", msg->data.c_str());
-    status_a = true;
+
+    if(my_point.size()!=0)  status = true;
+
+    if(my_point.size()==0)
+    {
+        is_exit = true;
+    }
 }
 
 int main(int argc, char **argv)
@@ -46,40 +61,40 @@ int main(int argc, char **argv)
 
     ros::Rate loop_rate(1);
 
-    add_point(50.0, 0.0, -420.0);
-    add_point(60.0, 100.0, -420.0);
-    add_point(70.0, 100.0, -420.0);
-    add_point(80.0, 100.0, -420.0);
-    add_point(200.0, -100.0, -420.0);
-    add_point(0.0, -100.0, -420.0);
-    add_point(30.0, -100.0, -420.0);
-    add_point(0.0, 0.0, -420.0);
+    add_point(50.0, 0.0, -420.0, circle);
+    add_point(60.0, 100.0, -420.0, square);
+    add_point(70.0, 100.0, -420.0, triangle);
+    add_point(80.0, 100.0, -420.0, circle);
+    add_point(200.0, -100.0, -420.0, square);
+    add_point(0.0, -100.0, -420.0, triangle);
+    add_point(30.0, -100.0, -420.0, circle);
+    add_point(0.0, 0.0, -420.0, square);
 
     simu_visual::posicionxyz posicionxyz;
-    status_a = true;
+    status = true;
+    is_exit =  false;
 
     while (ros::ok())
     {
-        if(status_a)
+        if(status)
         {
-            posicionxyz.x0 = my_point_a[0]->position_x;
-            posicionxyz.y0 = my_point_a[0]->position_y;
-            posicionxyz.z0 = my_point_a[0]->position_z;
+            posicionxyz.x0 = my_point[0]->position_x;
+            posicionxyz.y0 = my_point[0]->position_y;
+            posicionxyz.z0 = my_point[0]->position_z;
+            posicionxyz.type = my_point[0]->type;
 
             loop_rate.sleep();
             chatter_pub.publish(posicionxyz);
 
-            delete [] my_point_a[0];
-            my_point_a.erase(my_point_a.begin());
+            delete [] my_point[0];
+            my_point.erase(my_point.begin());
 
-            status_a = false;
-            ros::spinOnce();
+            status = false;
         }
 
-        if(my_point_a.size()==1)
+        if(is_exit)
         {
-            my_point_a.clear();
-            break;
+            return 0;
         }
 
         ros::spinOnce();

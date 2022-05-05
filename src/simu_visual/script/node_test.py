@@ -27,6 +27,7 @@ def node():
 
     global call_vmax_2
     global call_amax_2
+    global gripper
 
     global permiso_2
 
@@ -78,14 +79,14 @@ def node():
             largo = len(res_1[0])
 
             # Starting point
-            juntas = angulos_eulerianos(1, res_1[1][0], res_1[4][0], res_1[7][0], res_2[0][0], res_2[1][0], res_2[2][0])
+            juntas = angulos_eulerianos(1, res_1[1][0], res_1[4][0], res_1[7][0], res_2[0][0], res_2[1][0], res_2[2][0], gripper)
             delta = 1
             rospy.sleep(delta)
             pub.publish(juntas)
 
             for i in range(1, largo):
                 #juntas = angulos_eulerianos(t_m[i], x_m[i], y_m[i], z_m[i], theta1_m[i], theta2_m[i], theta3_m[i])
-                juntas = angulos_eulerianos(res_1[0][i] * 10.0, res_1[1][i], res_1[4][i], res_1[7][i], res_2[0][i], res_2[1][i], res_2[2][i])
+                juntas = angulos_eulerianos(res_1[0][i] * 10.0, res_1[1][i], res_1[4][i], res_1[7][i], res_2[0][i], res_2[1][i], res_2[2][i], gripper)
                 delta = res_1[0][i] * 10.0 - res_1[0][i-1] * 10.0
                 rospy.sleep(delta)
                 pub.publish(juntas)
@@ -113,6 +114,7 @@ def callback_linear_speed_xyz(data):
 
     global call_vmax_2
     global call_amax_2
+    global gripper
 
     permiso_2 = True
 
@@ -126,11 +128,12 @@ def callback_linear_speed_xyz(data):
 
     call_vmax_2 = data.vmax
     call_amax_2 = data.amax
+    gripper = data.gripper
 
 # |--------------------------------------|
 # |----------- Joint Angles -------------| 
 # |--------------------------------------|
-def angulos_eulerianos(ti, xi, yi, zi, th1, th2, th3):
+def angulos_eulerianos(ti, xi, yi, zi, th1, th2, th3, gripper):
     # Rviz interior angles in Radians
     joint = JointState()
     punto = [-yi * mmtm, -xi * mmtm, -zi * mmtm]
@@ -158,13 +161,13 @@ def angulos_eulerianos(ti, xi, yi, zi, th1, th2, th3):
                   "codo1_a",        "codo1_b",
                   "codo2_a",        "codo2_b",
                   "codo3_a",        "codo3_b",
-                  "act_x",          "act_y",         "act_z"]
+                  "act_x",          "act_y",         "act_z", "gripper"]
 
     joint.position = [th1 * dtr, th2 * dtr, th3 * dtr,
                       th1 * dtr + a1_a, a1_b,
                       th2 * dtr + a2_a, a2_b,
                       th3 * dtr + a3_a, a3_b,
-                      xi / 1000, yi / 1000, zi / 1000]
+                      xi / 1000, yi / 1000, zi / 1000, gripper]
 
     joint.velocity = []
     joint.effort = []

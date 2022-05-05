@@ -14,7 +14,14 @@ typedef struct point{
   double position_x;
   double position_y;
   double position_z;
+  int gripper;
 }point_t;
+
+enum{
+    circle = 1,
+    square,
+    triangle
+};
 
 vector<point_t *> my_point;
 bool status;
@@ -22,7 +29,9 @@ bool is_send_status_to_node_a;
 
 double x_current, y_current, z_current;
 double xx, yy, zz;
-double x_fixed, y_fixed, z_fixed;
+double x_circle, y_circle, z_circle;
+double x_square, y_square, z_square;
+double x_triangle, y_triangle, z_triangle;
 
 void add_point(double x, double y, double z);
 void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg);
@@ -50,9 +59,17 @@ int main(int argc, char **argv)
     y_current = 0.0;
     z_current = -375.0;
 
-    x_fixed = 100.0;
-    y_fixed = 100.0;
-    z_fixed = -420.0;
+    x_circle = 100.0;
+    y_circle = 100.0;
+    z_circle = -420.0;
+
+    x_square = -100.0;
+    y_square = 100.0;
+    z_square = -420.0;
+
+    x_triangle = -100.0;
+    y_triangle = -100.0;
+    z_triangle = -420.0;
 
     status = false;
     is_send_status_to_node_a = false;
@@ -72,6 +89,8 @@ int main(int argc, char **argv)
             linear_speed_xyz.vmax = 2000.0;
             linear_speed_xyz.amax = 100000.0;
 
+            linear_speed_xyz.gripper = my_point[0]->gripper;
+
             loop_rate.sleep();
             chatter_pub.publish(linear_speed_xyz);
 
@@ -81,7 +100,6 @@ int main(int argc, char **argv)
             my_point.erase(my_point.begin());
 
             status = false;
-            ros::spinOnce();
         }
 
         if(is_send_status_to_node_a)
@@ -100,7 +118,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void add_point(double x, double y, double z)
+void add_point(double x, double y, double z, int gripper)
 {
     point_t *data = NULL;
     data = new point_t;
@@ -108,6 +126,7 @@ void add_point(double x, double y, double z)
     data->position_x = x;
     data->position_y = y;
     data->position_z = z;
+    data->gripper = gripper;
 
     my_point.push_back(data);
 }
@@ -141,18 +160,39 @@ void node_a_callback(const simu_visual::posicionxyz::ConstPtr& msg)
     xx = msg->x0;
     yy = msg->y0;
     zz = msg->z0;
+    int type = msg->type;
 
     //cout<<"x: "<<xx<<" y: "<<yy<<" z: "<<zz<<endl;
 
-    add_point(x_current, y_current, z_current);
+    add_point(x_current, y_current, z_current, 0);
 
-    add_point(xx, yy, zz);
-    add_point(xx, yy, zz-30);
-    add_point(xx, yy, zz);
+    add_point(xx, yy, zz, 0);
+    add_point(xx, yy, zz-30, 1);
+    add_point(xx, yy, zz, 1);
 
-    add_point(x_fixed, x_fixed, z_fixed);
-    add_point(x_fixed, x_fixed, z_fixed-30);
-    add_point(x_fixed, x_fixed, z_fixed);
+    switch (type){
+    case circle:
+        add_point(x_circle, y_circle, z_circle, 1);
+        add_point(x_circle, y_circle, z_circle-30, 0);
+        add_point(x_circle, y_circle, z_circle, 0);
+        break;
+
+    case square:
+        add_point(x_square, y_square, z_square, 1);
+        add_point(x_square, y_square, z_square-30, 0);
+        add_point(x_square, y_square, z_square, 0);
+        break;
+
+    case triangle:
+        add_point(x_triangle, y_triangle, z_triangle, 1);
+        add_point(x_triangle, y_triangle, z_triangle-30, 0);
+        add_point(x_triangle, y_triangle, z_triangle, 0);
+        break;
+    
+    default:
+        break;
+    }
+    
 
     status = true;
 }

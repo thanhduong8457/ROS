@@ -6,3 +6,4 @@ float32 yf
 float32 zf
 float32 vmax
 float32 amax
+int64 gripper

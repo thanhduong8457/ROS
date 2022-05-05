@@ -26,7 +26,7 @@ vector<joint_t *> my_joint;
 
 void init_joint()
 {
-  for(int i=0; i <= 11; i++)
+  for(int i=0; i <= 12; i++)
   {
     joint_t *joint_temp = NULL;
     joint_temp = new joint_t;
@@ -45,7 +45,8 @@ void show_infor()
   float theta_2 = my_joint[1]->position*180/pi;
   float theta_3 = my_joint[2]->position*180/pi;
 
-  int gripper = 1;
+  int gripper = my_joint[12]->position;
+  //int gripper = 1;
 
   data_send.data = "{\"theta1\":\"" + to_string(theta_1) +
                     "\",\"theta2\":\"" + to_string(theta_2) +
@@ -58,7 +59,7 @@ void show_infor()
 
 void MoveGroupCallback(const sensor_msgs::JointState::ConstPtr& msg)
 {
-  for(int i=0; i<=11; i++)
+  for(int i=0; i<=12; i++)
   {
     my_joint[i]->name = msg->name[i];
     my_joint[i]->position = msg->position[i];
