@@ -35,9 +35,10 @@ def node():
     rospy.init_node("node_c", anonymous=False)
     rate = rospy.Rate(7.8125)  # Hz
 
-    #######  Publisher  ##################
+    #######  Subscriber  ##################
     rospy.Subscriber("input_ls_final", linear_speed_xyz, callback_linear_speed_xyz) # Topics
 
+    #######  Publisher  ##################
     pub = rospy.Publisher("joint_states", JointState, queue_size=10)
     pub_1 = rospy.Publisher("status_delta", String, queue_size=10)
 
@@ -161,7 +162,7 @@ def angulos_eulerianos(ti, xi, yi, zi, th1, th2, th3, gripper):
                   "codo1_a",        "codo1_b",
                   "codo2_a",        "codo2_b",
                   "codo3_a",        "codo3_b",
-                  "act_x",          "act_y",         "act_z", "gripper"]
+                  "act_x",          "act_y",         "act_z",       "gripper"]
 
     joint.position = [th1 * dtr, th2 * dtr, th3 * dtr,
                       th1 * dtr + a1_a, a1_b,

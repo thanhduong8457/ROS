@@ -127,7 +127,11 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-include_directories(include ${catkin_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS} include/simu_visual)
+
+add_executable(main_node src/main_node.cpp include/simu_visual/codos.cpp include/simu_visual/delta_robot.cpp)
+target_link_libraries(main_node ${catkin_LIBRARIES})
+add_dependencies(main_node simu_visual_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
 
 add_executable(node_b src/node_b.cpp)
 target_link_libraries(node_b ${catkin_LIBRARIES})

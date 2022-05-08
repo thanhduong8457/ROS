@@ -1,7 +1,7 @@
 import math
 import numpy as np
 from numpy.linalg import inv
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import delta_define
 
 ###############################################

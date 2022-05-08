@@ -61,14 +61,17 @@ int main(int argc, char **argv)
 
     ros::Rate loop_rate(1);
 
-    add_point(50.0, 0.0, -420.0, circle);
-    add_point(60.0, 100.0, -420.0, square);
-    add_point(70.0, 100.0, -420.0, triangle);
-    add_point(80.0, 100.0, -420.0, circle);
-    add_point(200.0, -100.0, -420.0, square);
-    add_point(0.0, -100.0, -420.0, triangle);
-    add_point(30.0, -100.0, -420.0, circle);
-    add_point(0.0, 0.0, -420.0, square);
+    //for(int i = 0; i<20; i++)
+    {
+        add_point(50.0, 0.0, -420.0, circle);
+        add_point(60.0, 100.0, -420.0, square);
+        add_point(70.0, 100.0, -420.0, triangle);
+        add_point(80.0, 100.0, -420.0, circle);
+        add_point(100.0, -100.0, -420.0, square);
+        add_point(0.0, -100.0, -420.0, triangle);
+        add_point(30.0, -100.0, -420.0, circle);
+        add_point(0.0, 0.0, -420.0, square);
+    }
 
     simu_visual::posicionxyz posicionxyz;
     status = true;

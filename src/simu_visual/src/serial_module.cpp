@@ -79,7 +79,7 @@ int main(int argc, char** argv)
 
   try
   {
-    ser.setPort("/dev/ttyS7");
+    ser.setPort("/dev/ttyS6");
     ser.setBaudrate(115200);
     serial::Timeout to = serial::Timeout::simpleTimeout(1000);
     ser.setTimeout(to);
