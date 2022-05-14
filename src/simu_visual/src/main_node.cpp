@@ -71,8 +71,7 @@ int main(int argc, char **argv)
         if(status)
         {
 	        m_delta_robot = new delta_robot;
-
-            //ROS_INFO("v_max= " + to_string(call_vmax_2) + "  a_max=" + to_string(call_amax_2));
+            ROS_INFO("v_max = %lf, a_max = %lf", call_vmax_2, call_amax_2);
             //path_linear_speed(xx, yy, zz, x, y, z);
             m_delta_robot->system_linear(call_xo_2, call_yo_2, call_zo_2, call_xf_2, call_yf_2, call_zf_2, dis, rot_z, rot_y, theta_y, theta_z, rot_tras);
 
@@ -116,7 +115,7 @@ int main(int argc, char **argv)
                 ros::Duration(delta).sleep();
             }
 
-            msg.data = "DONE";
+            msg.data = "from " + to_string(call_xo_2) + " " + to_string(call_yo_2) + " " + to_string(call_zo_2) + " to " + to_string(call_xf_2) + " " + to_string(call_yf_2) + " " + to_string(call_zf_2) + " is finished";
             status_to_node_b.publish(msg);
 
             delete m_delta_robot;

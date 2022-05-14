@@ -63,6 +63,7 @@ add_message_files(FILES
   parameter_ws.msg
   posicionxyz.msg
   PositionArm.msg
+  image_pos.msg
 )
 
 ## Generate services in the 'srv' folder

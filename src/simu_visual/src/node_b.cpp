@@ -61,15 +61,15 @@ int main(int argc, char **argv)
 
     x_circle = 100.0;
     y_circle = 100.0;
-    z_circle = -420.0;
+    z_circle = -450.0;
 
     x_square = -100.0;
     y_square = 100.0;
-    z_square = -420.0;
+    z_square = -450.0;
 
     x_triangle = -100.0;
     y_triangle = -100.0;
-    z_triangle = -420.0;
+    z_triangle = -450.0;
 
     status = false;
     is_send_status_to_node_a = false;
@@ -133,7 +133,7 @@ void add_point(double x, double y, double z, int gripper)
 
 void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg)
 {
-    ROS_INFO("status from node_c: [%s]", msg->data.c_str());
+    ROS_INFO("status from main_node: [%s]", msg->data.c_str());
 
     if(my_point.size()==1)
     {
@@ -167,25 +167,25 @@ void node_a_callback(const simu_visual::posicionxyz::ConstPtr& msg)
     add_point(x_current, y_current, z_current, 0);
 
     add_point(xx, yy, zz, 0);
-    add_point(xx, yy, zz-30, 1);
+    add_point(xx, yy, zz-20, 1);
     add_point(xx, yy, zz, 1);
 
     switch (type){
     case circle:
         add_point(x_circle, y_circle, z_circle, 1);
-        add_point(x_circle, y_circle, z_circle-30, 0);
+        add_point(x_circle, y_circle, z_circle-20, 0);
         add_point(x_circle, y_circle, z_circle, 0);
         break;
 
     case square:
         add_point(x_square, y_square, z_square, 1);
-        add_point(x_square, y_square, z_square-30, 0);
+        add_point(x_square, y_square, z_square-20, 0);
         add_point(x_square, y_square, z_square, 0);
         break;
 
     case triangle:
         add_point(x_triangle, y_triangle, z_triangle, 1);
-        add_point(x_triangle, y_triangle, z_triangle-30, 0);
+        add_point(x_triangle, y_triangle, z_triangle-20, 0);
         add_point(x_triangle, y_triangle, z_triangle, 0);
         break;
     
