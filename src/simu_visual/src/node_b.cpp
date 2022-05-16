@@ -59,17 +59,17 @@ int main(int argc, char **argv)
     y_current = 0.0;
     z_current = -375.0;
 
-    x_circle = 100.0;
-    y_circle = 100.0;
-    z_circle = -450.0;
+    x_circle = -50.0;
+    y_circle = -100.0;
+    z_circle = -453.0;
 
-    x_square = -100.0;
-    y_square = 100.0;
-    z_square = -450.0;
+    x_square = 0.0;
+    y_square = -100.0;
+    z_square = -453.0;
 
-    x_triangle = -100.0;
+    x_triangle = 50.0;
     y_triangle = -100.0;
-    z_triangle = -450.0;
+    z_triangle = -453.0;
 
     status = false;
     is_send_status_to_node_a = false;

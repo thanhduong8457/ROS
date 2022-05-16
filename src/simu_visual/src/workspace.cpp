@@ -98,6 +98,24 @@ int main()
     {
         cout<<"With z = "<<m_my_data[i]->zz<<" we have rmax = "<<m_my_data[i]->rr<<endl;
     }
+    
+    cout<<endl;
+
+    cout<<"[";
+    for(int i = 0; i<m_my_data.size(); i++)
+    {
+        cout<<m_my_data[i]->zz<<" ";
+    }
+    cout<<"]";
+
+    cout<<endl;
+
+    cout<<"[";
+    for(int i = 0; i<m_my_data.size(); i++)
+    {
+        cout<<m_my_data[i]->rr<<" ";
+    }
+    cout<<"]";
 
     
 	// cout<<"theta_1: "<<theta_1<<" theta_2: "<<theta_2<<" theta_3: "<<theta_3<<endl;
