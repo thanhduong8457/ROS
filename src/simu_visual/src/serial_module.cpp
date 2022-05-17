@@ -48,9 +48,9 @@ void show_infor()
   int gripper = my_joint[12]->position;
   //int gripper = 1;
 
-  data_send.data = "{\"theta1\":\"" + to_string(theta_1) +
-                    "\",\"theta2\":\"" + to_string(theta_2) +
-                    "\",\"theta3\":\"" + to_string(theta_3) + "\",\"gripper\":\"" + to_string(gripper) + "\"}\n";
+  data_send.data = "{\"tt1\":\"" + to_string((int)(theta_1*100)) +
+                    "\",\"tt2\":\"" + to_string((int)(theta_2*100)) +
+                    "\",\"tt3\":\"" + to_string((int)(theta_3*100)) + "\",\"gp\":\"" + to_string(gripper) + "\"}\n";
 
   ser.write(data_send.data); 
 
@@ -80,6 +80,7 @@ int main(int argc, char** argv)
   try
   {
     ser.setPort("/dev/ttyS6");
+    //ser.setPort("/dev/ttyTHS1");
     ser.setBaudrate(115200);
     serial::Timeout to = serial::Timeout::simpleTimeout(1000);
     ser.setTimeout(to);

@@ -17,7 +17,7 @@ typedef struct point{
 }point_t;
 
 enum{
-    circle = 1,
+    circle = 0,
     square,
     triangle
 };

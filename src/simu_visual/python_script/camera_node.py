@@ -98,18 +98,17 @@ def show_camera():
                     data_image.type = type_obj
                     rospy.sleep(1)
                     data_image_pub.publish(data_image)
-                    #while True:
-                    #  cv2.imshow("window_name", imgContour)
-                    #  if cv2.waitKey(1) & 0xFF == ord('q'):
-                    #    break
-
+                    # while True:
+                    #     cv2.imshow("window_name", imgContour)
+                    #     if cv2.waitKey(1) & 0xFF == ord('q'):
+                    #         break
 
                 is_continue_to_take_another_image = False
 
             else:
                 if(is_wait):
                     print("sleep for 5s and process another images")
-                    rospy.sleep(5)
+                    rospy.sleep(1)
                     is_continue_to_take_another_image = True
                     is_wait = False
 
