@@ -61,20 +61,17 @@ int main(int argc, char **argv)
 
     ros::Rate loop_rate(1);
 
-    //for(int i = 0; i<20; i++)
-    {
-        add_point(0.0, 100.0, -453.0, circle);
-        add_point(0.0, 100.0, -453.0, square);
-        add_point(0.0, 100.0, -453.0, triangle);
+    add_point(0.0, 100.0, -453.0, circle);
+    add_point(0.0, 100.0, -453.0, square);
+    add_point(0.0, 100.0, -453.0, triangle);
 
-        add_point(0.0, 100.0, -453.0, circle);
-        add_point(0.0, 100.0, -453.0, square);
-        add_point(0.0, 100.0, -453.0, triangle);
+    add_point(0.0, 100.0, -453.0, circle);
+    add_point(0.0, 100.0, -453.0, square);
+    add_point(0.0, 100.0, -453.0, triangle);
 
-        add_point(0.0, 100.0, -453.0, circle);
-        add_point(0.0, 100.0, -453.0, square);
-        add_point(0.0, 100.0, -453.0, triangle);
-    }
+    add_point(0.0, 100.0, -453.0, circle);
+    add_point(0.0, 100.0, -453.0, square);
+    add_point(0.0, 100.0, -453.0, triangle);
 
     simu_visual::posicionxyz posicionxyz;
     status = true;
@@ -106,6 +103,5 @@ int main(int argc, char **argv)
         ros::spinOnce();
     }
 
-    //ros::spin();
     return 0;
 }

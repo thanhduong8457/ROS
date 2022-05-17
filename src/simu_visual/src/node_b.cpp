@@ -7,6 +7,7 @@
 #include "std_msgs/String.h"
 #include "simu_visual/linear_speed_xyz.h"
 #include "simu_visual/posicionxyz.h"
+#include "simu_visual/vmax_amax.h"
 
 using namespace std;
 
@@ -18,7 +19,7 @@ typedef struct point{
 }point_t;
 
 enum{
-    circle = 1,
+    circle = 0,
     square,
     triangle
 };
@@ -26,6 +27,8 @@ enum{
 vector<point_t *> my_point;
 bool status;
 bool is_send_status_to_node_a;
+
+double vmax, amax;
 
 double x_current, y_current, z_current;
 double xx, yy, zz;
@@ -36,6 +39,8 @@ double x_triangle, y_triangle, z_triangle;
 void add_point(double x, double y, double z);
 void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg);
 void node_a_callback(const simu_visual::posicionxyz::ConstPtr& msg);
+void set_vmax_amax_callback(const simu_visual::vmax_amax::ConstPtr& msg);
+void set_current_point_callback(const simu_visual::posicionxyz::ConstPtr& msg);
 
 
 int main(int argc, char **argv)
@@ -45,6 +50,8 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
 
     ros::Subscriber receive_node_a = nh.subscribe("send_to_node_b", 1000, node_a_callback);
+    ros::Subscriber set_vmax_amax = nh.subscribe("set_vmax_amax", 1000, set_vmax_amax_callback);
+    ros::Subscriber set_current_point = nh.subscribe("set_current_point", 1000, set_current_point_callback);
     ros::Subscriber sub_status_delta = nh.subscribe("status_delta", 1000, Status_Delta_Callback);
 
     ros::Publisher chatter_pub = nh.advertise<simu_visual::linear_speed_xyz>("input_ls_final", 1000);
@@ -71,6 +78,9 @@ int main(int argc, char **argv)
     y_triangle = -100.0;
     z_triangle = -453.0;
 
+    vmax = 10000.0;
+    amax = 100000.0;
+
     status = false;
     is_send_status_to_node_a = false;
 
@@ -86,8 +96,8 @@ int main(int argc, char **argv)
             linear_speed_xyz.yf = my_point[1]->position_y;
             linear_speed_xyz.zf = my_point[1]->position_z;
 
-            linear_speed_xyz.vmax = 10000.0;
-            linear_speed_xyz.amax = 100000.0;
+            linear_speed_xyz.vmax = vmax;
+            linear_speed_xyz.amax = amax;
 
             linear_speed_xyz.gripper = my_point[0]->gripper;
 
@@ -162,7 +172,7 @@ void node_a_callback(const simu_visual::posicionxyz::ConstPtr& msg)
     zz = msg->z0;
     int type = msg->type;
 
-    //cout<<"x: "<<xx<<" y: "<<yy<<" z: "<<zz<<endl;
+    cout<<"Processing point x: "<<xx<<" y: "<<yy<<" z: "<<zz<<endl;
 
     add_point(x_current, y_current, z_current, 0);
 
@@ -193,6 +203,31 @@ void node_a_callback(const simu_visual::posicionxyz::ConstPtr& msg)
         break;
     }
     
-
     status = true;
+}
+
+void set_vmax_amax_callback(const simu_visual::vmax_amax::ConstPtr& msg)
+{
+    vmax = msg->vmax;
+    amax = msg->amax;
+    cout<<"set vmax = "<<vmax<<", and set amax = "<<amax<<endl;
+}
+
+void set_current_point_callback(const simu_visual::posicionxyz::ConstPtr& msg)
+{
+    x_current = msg->x0;
+    y_current = msg->y0;
+    z_current = msg->z0;
+
+    if(z_current>-375||z_current<-480)
+    {
+        x_current = msg->x0;
+        y_current = msg->y0;
+        z_current = -375.0;
+        cout<<"[ERROR] Invalid point, current point now set to x: "<<x_current<<" y: "<<y_current<<" z: "<<z_current<<endl;
+    }
+    else
+    {
+        cout<<"current point set to point x: "<<x_current<<" y: "<<y_current<<" z: "<<z_current<<endl;
+    }
 }

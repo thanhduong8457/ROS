@@ -1,6 +1,7 @@
 #include "ros/ros.h"
 #include "std_msgs/String.h"
 #include "simu_visual/linear_speed_xyz.h"
+#include "simu_visual/num_point.h"
 #include "sensor_msgs/JointState.h"
 
 #include "delta_define.h"
@@ -9,10 +10,14 @@
 double call_xo_2, call_yo_2, call_zo_2;
 double call_xf_2, call_yf_2, call_zf_2;
 double call_vmax_2, call_amax_2;
+
+int num_point_1, num_point_2;
+
 int gripper;
 bool status;
 
 void callback_linear_speed_xyz(const simu_visual::linear_speed_xyz::ConstPtr& msg);
+void set_num_point_callback(const simu_visual::num_point::ConstPtr& msg);
 
 int main(int argc, char **argv)
 {
@@ -22,12 +27,16 @@ int main(int argc, char **argv)
 
     // ##################  Subscriber  ##################
     ros::Subscriber receive_node_a = nh.subscribe("input_ls_final", 1000, callback_linear_speed_xyz);
+    ros::Subscriber set_num_point = nh.subscribe("set_num_point", 1000, set_num_point_callback);
 
     // ##################  Publisher  ##################
     ros::Publisher pub_for_rviz = nh.advertise<sensor_msgs::JointState>("joint_states", 1000);
     ros::Publisher status_to_node_b = nh.advertise<std_msgs::String>("status_delta", 1000);
 
     ros::Rate loop_rate(7.8125);
+
+    num_point_1 = 90;
+    num_point_2 = 200;
 
     double dis, theta_y, theta_z;
 
@@ -76,7 +85,7 @@ int main(int argc, char **argv)
             m_delta_robot->system_linear(call_xo_2, call_yo_2, call_zo_2, call_xf_2, call_yf_2, call_zf_2, dis, rot_z, rot_y, theta_y, theta_z, rot_tras);
 
             // Trapezoidal velocity profile
-            m_delta_robot->ls_v_a_total(0, dis, call_vmax_2, call_amax_2, 50, 150);
+            m_delta_robot->ls_v_a_total(0, dis, call_vmax_2, call_amax_2, num_point_1, num_point_2);
 
             // Reverse rotation end point, start point and trajectory #######
             m_delta_robot->system_linear_matrix(m_delta_robot->m_data_delta.size(), rot_z, rot_y, theta_y, theta_z, rot_tras);
@@ -146,4 +155,12 @@ void callback_linear_speed_xyz(const simu_visual::linear_speed_xyz::ConstPtr& ms
     gripper = msg->gripper;
 
     status = true;
+}
+
+void set_num_point_callback(const simu_visual::num_point::ConstPtr& msg)
+{
+    num_point_1 = msg->num_point_1;
+    num_point_2 = msg->num_point_2;
+
+    cout<<"set num_point_1 = "<<num_point_1<<" and num_point_2 = "<<num_point_2<<endl;
 }

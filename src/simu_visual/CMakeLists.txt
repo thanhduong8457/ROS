@@ -54,16 +54,12 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(FILES
   angulo.msg
-  input_dp1.msg
-  input_path_l_xyz.msg
-  linear_speed_path.msg
   linear_speed_xyz.msg
-  matriz_path_ls.msg
-  msg_tm1.msg
-  parameter_ws.msg
   posicionxyz.msg
   PositionArm.msg
   image_pos.msg
+  vmax_amax.msg
+  num_point.msg
 )
 
 ## Generate services in the 'srv' folder
