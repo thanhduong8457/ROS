@@ -142,6 +142,10 @@ add_executable(node_a src/node_a.cpp)
 target_link_libraries(node_a ${catkin_LIBRARIES})
 add_dependencies(node_a simu_visual_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
 
+add_executable(test_node_a src/test_node_a.cpp)
+target_link_libraries(test_node_a ${catkin_LIBRARIES})
+add_dependencies(test_node_a simu_visual_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
+
 add_executable(serial_module src/serial_module.cpp)
 target_link_libraries(serial_module ${catkin_LIBRARIES})
 add_dependencies(serial_module simu_visual_generate_messages_cpp ${catkin_EXPORTED_TARGETS})

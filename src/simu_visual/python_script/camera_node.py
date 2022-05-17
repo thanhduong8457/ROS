@@ -129,7 +129,7 @@ def add_pos(a, b, c, d, x, y, z, type, e):
         
     x.append(x_temp) 
     y.append(y_temp)
-    z.append(float(-450))
+    z.append(float(-453))
     type.append(int(e))
 
     # if arr0 not in arr:

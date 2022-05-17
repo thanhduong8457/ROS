@@ -59,7 +59,7 @@ int main(int argc, char **argv)
     y_current = 0.0;
     z_current = -375.0;
 
-    x_circle = -50.0;
+    x_circle = -100.0;
     y_circle = -100.0;
     z_circle = -453.0;
 
@@ -67,7 +67,7 @@ int main(int argc, char **argv)
     y_square = -100.0;
     z_square = -453.0;
 
-    x_triangle = 50.0;
+    x_triangle = 100.0;
     y_triangle = -100.0;
     z_triangle = -453.0;
 
