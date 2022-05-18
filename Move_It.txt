@@ -1,0 +1,103 @@
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+http://docs.ros.org/en/melodic/api/moveit_tutorials/html/doc/move_group_interface/move_group_interface_tutorial.html
+#spider robot
+https://hackaday.io/project/180534-zerobug-diy-hexapod-robot
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+Controlled by Servotronix softMC Motion Controller and CDHD Servo Drives, via EtherCAT
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+
+#Design Robot on solidwork
+https://www.youtube.com/watch?v=p9c9KoKjEe0
+
+#Export URDF file from solidwork
+https://www.youtube.com/watch?v=OSL-zqw4cXs
+
+#Run setup assitant with URDF file
+https://www.youtube.com/watch?v=IS3JIV45rh0
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+
+#Design Delta robot on solidwork
+https://www.youtube.com/watch?v=xt7HtHjXo4s
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+Hello,Robotics in a Nutshell,
+
+My name is Le Thanh Duong, I'm a student from Viet Nam. During this time I have a project related about control a Delta Robot using MoveIt.
+
+I have watched your video about how to export URDF files from Solidworks and It's very helpful for me,thank you so much for your video. 
+
+I tried to export URDF files for my Delta Robot but I have a problem. Because Delta Robot is a parallel Robot that is different from the Robot in the video so I didn't know how to configure it in the right way.
+Could you help me to check and export the URDF file from it. I have attached the Delta Robot file in the link below.
+
+Thank you and best regards,
+
+Le Thanh Duong.
+
+https://drive.google.com/drive/folders/1dkKLpW3TJ-d8IFZL--MVkz4yFkIa4taS?usp=sharing
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+Simplified Delta Robot Kinematic Equations
+https://www.youtube.com/watch?v=FTRCwuAnr6o&list=RDCMUCpTuKJrXFwybnpOG7HpTpZw&index=2
+https://www.marginallyclever.com/other/samples/fk-ik-test.html
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+
+roslaunch panda_moveit_config demo.launch rviz_tutorial:=true
+
+roslaunch moveit_setup_assistant setup_assistant.launch
+
+Create package:
+	catkin_create_pkg my_delta_robot std_msgs rospy roscpp
+
+Build package:
+	$ catkin_make --only-pkg-with-deps [package_name]
+	
+	catkin_make --only-pkg-with-deps beginner_tutorials
+	catkin_make --only-pkg-with-deps my_delta_robot
+	
+	rosdep check rqt_graph
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+# check URDF file
+	check_urdf delta_robot.urdf
+	urdf_to_graphiz delta_robot.urdf
+	evince Delta_robot.pdf
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+-------- [shell 1]: ROS Master
+roscore
+
+-------- [shell 2]: Run Rviz
+roslaunch my_delta_robot my_delta.launch
+
+-------- [shell 3]: Path Node and Torques
+rosrun my_delta_robot main_node
+
+-------- [shell 4]: Run Node
+rosrun my_delta_robot node_b
+
+-------- [shell 5]: Run Node
+rosrun my_delta_robot node_a
+
+-------- [shell 6]: Run Node
+rosrun my_delta_robot camera_node.py
+
+-------- [shell 7]: Run rqt_graph to visualize the relation between Node and Topic
+rosrun rqt_graph rqt_graph
+
+-------- [shell 8]: Message for the torques and trajectories node
+rostopic pub -1 /input_ls_final my_delta_robot/linear_speed_xyz -- 0.0 0.0 -375.0 0.0 0.0 -490.0 200.0 10000.0
+rostopic pub -1 /input_ls_final my_delta_robot/linear_speed_xyz -- 0.0 0.0 -490.0 0.0 0.0 -375.0 200.0 10000.0
+rostopic pub -1 /input_ls_final my_delta_robot/linear_speed_xyz -- 0.0 0.0 -375.0 0.0 150.0 -490.0 200.0 10000.0
+rostopic pub -1 /input_ls_final my_delta_robot/linear_speed_xyz -- 0.0 150.0 -490.0 0.0 -150.0 -490.0 200.0 10000.0
+rostopic pub -1 /input_ls_final my_delta_robot/linear_speed_xyz -- 0.0 -150.0 -490.0 0.0 0.0 -375.0 200.0 10000.0
+
+Thử thách 6 ngày 6 đêm về nhà, dù ba mẹ có đuổi lên lại SG mình nhất quyết không lên là không lên! Gét Gô!!!
+
+rostopic pub -1 /status_to_image_node std_msgs/String -- "Done"
+
+rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 0.0 0.0 -375 1
+
+rostopic pub -1 /set_num_point my_delta_robot/num_point -- 90 200
+
+# set vmax and a max for robot
+rostopic pub -1 /set_vmax_amax my_delta_robot/vmax_amax -- 1500.0 200000.0

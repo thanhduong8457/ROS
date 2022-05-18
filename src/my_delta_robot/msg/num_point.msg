@@ -1,0 +1,2 @@
+int64 num_point_1
+int64 num_point_2

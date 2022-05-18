@@ -1,0 +1,179 @@
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS
+ROS Master:
+	- The ROS Master is as program that stores information about the network.
+	- Nodes register themselves with the Master on startup.
+	- Nodes ask the Master where to find other nodes. After that, nodes establish peer-to-peer communication with each other.
+Topics:
+	- Topics are streams of data
+	- Data can come consistently, many times a second
+	- Data can come intermittently
+	- A topic is uniquely identified by its name
+	- Nodes can piblish data to a topic or subscribe to data published onto its
+Services:
+	- Think of it as a function calll or an RPC
+	- A server provides a service
+	- A client calls the service, waits, then gets a response back
+	- Also uniquely indentified by name.
+Messages:
+	- Main languges for ROS are C++ and Python.
+	- Messages are language-agnostic way to represent data.
+	- ROS data type used when subscribing or publishing to a topic.
+Nodes:
+	- A node is an executable that uses ROS to communicate with other nodes.
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS
+#catkin_workplace:
+workspace_folder/         -- WORKSPACE
+  src/                    -- SOURCE SPACE
+    CMakeLists.txt        -- The 'toplevel' CMake file
+    package_1/
+      CMakeLists.txt
+      package.xml
+      ...
+    package_n/
+      CATKIN_IGNORE       -- Optional empty file to exclude package_n from being processed
+      CMakeLists.txt
+      package.xml
+      ...
+  build/                  -- BUILD SPACE
+    CATKIN_IGNORE         -- Keeps catkin from walking this directory
+  devel/                  -- DEVELOPMENT SPACE (set by CATKIN_DEVEL_PREFIX)
+    bin/
+    etc/
+    include/
+    lib/
+    share/
+    .catkin
+    env.bash
+    setup.bash
+    setup.sh
+    ...
+  install/                -- INSTALL SPACE (set by CMAKE_INSTALL_PREFIX)
+    bin/
+    etc/
+    include/
+    lib/
+    share/
+    .catkin             
+    env.bash
+    setup.bash
+    setup.sh
+    ...
+	
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS
+http://wiki.ros.org/ROS/Tutorials/CreatingPackage
+Creating a catkin Package:
+	- Create directory:
+		$ mkdir ~/catkin_ws/src
+		cd ~/catkin_ws/src
+	- Use the catkin_create_pkg script to create a new package called 'beginner_tutorials' which depends on std_msgs, roscpp, and rospy:
+		$ catkin_create_pkg my_delta_robot std_msgs rospy roscpp
+		Systax: $ catkin_create_pkg <package_name> [depend1] [depend2] [depend3]
+	- Building a catkin workspace and sourcing the setup file:
+		$ cd ~/catkin_ws
+		$ catkin_make
+	- To add the workspace to your ROS environment you need to source the generated setup file:
+		$ . ~/catkin_ws/devel/setup.bash
+	- First-order dependencies:
+		$ rospack depends1 beginner_tutorials 
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS	
+How can we completely remove a single catkin package from our catkin workspace?
+	$ cd ~/catkin_ws
+	$ catkin_make clean package_name
+	
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS
+#ROS Messages
+rostopic type returns the message type of any topic being published:
+	- To show list of topic:
+		$ rostopic list
+	- To show rostopic type:
+		$ rostopic type [topic]
+	- Show details of the message using rosmsg:
+		$ rosmsg show [type]
+		$ rostopic type [topic] | rosmsg show
+rostopic pub:
+	- rostopic pub publishes data on to a topic:
+		$ rostopic pub [topic] [msg_type] [args]
+	- Use 'rostopic echo' to see the data published from node
+		$ rostopic echo [topic]
+	- Use rostopic hz to reports the rate at which data is published:
+		$ rostopic hz [topic]
+Using rqt:
+	- rqt_graph:
+		$ rosrun rqt_graph rqt_graph
+	- rqt_plot:
+		$ rosrun rqt_plot rqt_plot
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS
+ROS Services and Parameters(using the rosservice and rosparam commandline tools)
+ROS Services:
+	- Services are another way that nodes can communicate with each other. Services allow nodes to send a request and receive a response.
+	- Using rosservice: rosservice can easily attach to ROS's client/service framework with services. rosservice has many commands that can be used on services, as shown.
+		+ rosservice list         print information about active services
+		+ rosservice call         call the service with the provided args
+			$ rosservice call [service] [args]
+		+ rosservice type         print service type
+			$ rosservice type [service]
+		+ rosservice find         find services by service type
+		+ rosservice uri          print service ROSRPC uri
+	- Looking at the information for the service:
+		$ rosservice type [service] | rossrv show
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS
+Using rosparam:
+	- rosparam allows you to store and manipulate data on the ROS Parameter Server. The Parameter Server can store integers, floats, boolean, dictionaries, and lists. rosparam uses the YAML markup language for syntax. In simple cases, YAML looks very natural: 1 is an integer, 1.0 is a float, one is a string, true is a boolean, [1, 2, 3] is a list of integers, and {a: b, c: d} is a dictionary.
+		+ rosparam set            set parameter
+			$ rosparam set [param_name]
+		+ rosparam get            get parameter
+			$ rosparam get [param_name]
+		+ rosparam load           load parameters from file
+			$ rosparam load [file_name] [namespace]
+		+ rosparam dump           dump parameters to file
+			$ rosparam dump [file_name] [namespace]
+		+ rosparam delete         delete parameter
+		+ rosparam list           list parameter names
+		
+Using roslaunch:
+	- roslaunch starts nodes as defined in a launch file.
+		$ roslaunch [package] [filename.launch]
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS
+Using rosed to edit files in ROS:
+	- Using rosed: It allows we to directly edit a file within a package by using the package name rather than having to type the entire path to the package.
+		$ rosed [package_name] [filename]
+		
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS
+http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv
+Creating a ROS msg and srv:
+	- msg: msg files are simple text files that describe the fields of a ROS message. They are used to generate source code for messages in different languages.
+	- msgs are just simple text files with a field type and field name per line. The field types you can use are:
+		+ int8, int16, int32, int64 (plus uint*)
+		+ float32, float64
+		+ string
+		+ time, duration
+		+ other msg files
+		+ variable-length array[] and fixed-length array[C]
+	- srv: an srv file describes a service. It is composed of two parts: a request and a response.
+	- srv files are just like msg files, except they contain two parts: a request and a response. The two parts are separated by a '---' line. Here is an example of a srv file:
+		int64 A
+		int64 B
+		---
+		int64 Sum
+	
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS
+Recording data:
+	- Running rosbag record with the option -a, indicating that all published topics should be accumulated in a bag file.
+		$ rosbag record -a
+	- Command checks the contents of the bag file without playing it back
+		$ rosbag info <your bagfile>
+	- Replay the bag file to reproduce behavior in the running system.
+		$ rosbag play <your bagfile>
+	- Replay the bag file to reproduce behavior in the running system twice as fast.
+		$ rosbag play -r 2 <your bagfile>
+	- Recording a subset of the data
+		$ rosbag record -O subset [topic] [topic]
+		
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS
+rosdep:
+	- rosdep is a tool you can use to install system dependencies required by ROS packages
+		$ rosdep install [package]
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS
+ROS with GUI
+https://www.youtube.com/watch?v=4ffeJe8uBVw

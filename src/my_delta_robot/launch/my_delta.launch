@@ -1,0 +1,9 @@
+<launch>
+   <!-- comentarios -->
+    <arg name="model" />
+	<arg name="gui" default="true" />
+	<param name="robot_description" textfile="$(find my_delta_robot)/urdf/delta_robot.urdf" />
+	<param name="use_gui" value="$(arg gui)"/>
+	<node name="robot_pub" pkg="robot_state_publisher" type="robot_state_publisher" />
+	<node name="rviz" pkg="rviz" type="rviz" args="−d $(find my_delta_robot)/rviz/my_config.rviz" required="true" />
+</launch>
