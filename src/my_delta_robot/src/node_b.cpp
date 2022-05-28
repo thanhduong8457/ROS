@@ -30,7 +30,7 @@ bool is_send_status_to_node_a;
 
 double vmax, amax;
 
-double x_current, y_current, z_current;
+double x_current, y_current, z_current, z_start, z_end;
 double xx, yy, zz;
 double x_circle, y_circle, z_circle;
 double x_square, y_square, z_square;
@@ -62,6 +62,7 @@ int main(int argc, char **argv)
     my_delta_robot::linear_speed_xyz linear_speed_xyz;
     std_msgs::String msg;
 
+    //set default value
     x_current = 0.0;
     y_current = 0.0;
     z_current = -375.0;
@@ -77,6 +78,9 @@ int main(int argc, char **argv)
     x_triangle = 100.0;
     y_triangle = -100.0;
     z_triangle = -453.0;
+
+    z_start = 20;
+    z_end = 10;
 
     vmax = 10000.0;
     amax = 100000.0;
@@ -177,25 +181,25 @@ void node_a_callback(const my_delta_robot::posicionxyz::ConstPtr& msg)
     add_point(x_current, y_current, z_current, 0);
 
     add_point(xx, yy, zz, 0);
-    add_point(xx, yy, zz-20, 1);
+    add_point(xx, yy, zz - z_start, 1);
     add_point(xx, yy, zz, 1);
 
     switch (type){
     case circle:
         add_point(x_circle, y_circle, z_circle, 1);
-        add_point(x_circle, y_circle, z_circle-20, 0);
+        add_point(x_circle, y_circle, z_circle-z_end, 0);
         add_point(x_circle, y_circle, z_circle, 0);
         break;
 
     case square:
         add_point(x_square, y_square, z_square, 1);
-        add_point(x_square, y_square, z_square-20, 0);
+        add_point(x_square, y_square, z_square-z_end, 0);
         add_point(x_square, y_square, z_square, 0);
         break;
 
     case triangle:
         add_point(x_triangle, y_triangle, z_triangle, 1);
-        add_point(x_triangle, y_triangle, z_triangle-20, 0);
+        add_point(x_triangle, y_triangle, z_triangle-z_end, 0);
         add_point(x_triangle, y_triangle, z_triangle, 0);
         break;
     
@@ -215,19 +219,65 @@ void set_vmax_amax_callback(const my_delta_robot::vmax_amax::ConstPtr& msg)
 
 void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg)
 {
-    x_current = msg->x0;
-    y_current = msg->y0;
-    z_current = msg->z0;
+    int temp = msg->type;
 
-    if(z_current>-375||z_current<-480)
+    switch (temp)
     {
+    case (-1):
         x_current = msg->x0;
         y_current = msg->y0;
-        z_current = -375.0;
-        cout<<"[ERROR] Invalid point, current point now set to x: "<<x_current<<" y: "<<y_current<<" z: "<<z_current<<endl;
-    }
-    else
-    {
-        cout<<"current point set to point x: "<<x_current<<" y: "<<y_current<<" z: "<<z_current<<endl;
+        z_current = msg->z0;
+
+        if(z_current>-375||z_current<-480)
+        {
+            z_current = -375.0;
+            cout<<"[ERROR] Invalid point, current point now set to x: "<<x_current<<" y: "<<y_current<<" z: "<<z_current<<endl;
+        }
+        else
+        {
+            cout<<"current point set to point x: "<<x_current<<" y: "<<y_current<<" z: "<<z_current<<endl;
+        }
+        break;
+    
+    case (0):
+        x_circle = msg->x0;
+        y_circle = msg->y0;
+        z_circle = msg->z0;
+        cout<<"Position to put CIRCLE is set to x: "<<x_circle<<" y: "<<y_circle<<" z: "<<z_circle<<endl;
+        break;
+
+    case (1):
+        x_square = msg->x0;
+        y_square = msg->y0;
+        z_square = msg->z0;
+        cout<<"Position to put SQUARE is set to x: "<<x_square<<" y: "<<y_square<<" z: "<<z_square<<endl;
+        break;
+
+    case (2):
+        x_triangle = msg->x0;
+        y_triangle = msg->y0;
+        z_triangle = msg->z0;
+        cout<<"Position to put TRIANGLE is set to x: "<<x_triangle<<" y: "<<y_triangle<<" z: "<<z_triangle<<endl;
+        break;
+
+    case (3):
+        z_start = msg->x0;
+        cout<<"the distance to go down and grip when START is set to: "<<z_start<<endl;
+        break;
+
+    case (4):
+        z_end = msg->x0;
+        cout<<"the distance to go down and grip when END is set to: "<<z_end<<endl;
+        break;
+
+    case (5):
+        z_start = msg->x0;
+        z_end = msg->y0;
+        cout<<"the distance to go down and grip when START is set to: "<<z_start<<endl;
+        cout<<"the distance to go down and grip when END is set to: "<<z_end<<endl;
+        break;
+    
+    default:
+        break;
     }
 }

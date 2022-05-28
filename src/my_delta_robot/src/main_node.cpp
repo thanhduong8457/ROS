@@ -3,6 +3,7 @@
 #include "my_delta_robot/linear_speed_xyz.h"
 #include "my_delta_robot/num_point.h"
 #include "sensor_msgs/JointState.h"
+#include "my_delta_robot/vmax_amax.h"
 
 #include "delta_define.h"
 #include "delta_robot.h"
@@ -32,11 +33,12 @@ int main(int argc, char **argv)
     // ##################  Publisher  ##################
     ros::Publisher pub_for_rviz = nh.advertise<sensor_msgs::JointState>("joint_states", 1000);
     ros::Publisher status_to_node_b = nh.advertise<std_msgs::String>("status_delta", 1000);
+    ros::Publisher v_a_out = nh.advertise<my_delta_robot::vmax_amax>("v_a_out", 1000);
 
     ros::Rate loop_rate(7.8125);
 
-    num_point_1 = 90;
-    num_point_2 = 200;
+    num_point_1 = 120;
+    num_point_2 = 120;
 
     double dis, theta_y, theta_z;
 
@@ -47,6 +49,7 @@ int main(int argc, char **argv)
 
     std_msgs::String msg;
     sensor_msgs::JointState JointState;
+    my_delta_robot::vmax_amax vm_am;
 
     JointState.header.frame_id = "";  
 
@@ -79,8 +82,11 @@ int main(int argc, char **argv)
     {
         if(status)
         {
+            // contruct a new delta_robot
 	        m_delta_robot = new delta_robot;
+
             ROS_INFO("v_max = %lf, a_max = %lf", call_vmax_2, call_amax_2);
+
             //path_linear_speed(xx, yy, zz, x, y, z);
             m_delta_robot->system_linear(call_xo_2, call_yo_2, call_zo_2, call_xf_2, call_yf_2, call_zf_2, dis, rot_z, rot_y, theta_y, theta_z, rot_tras);
 
@@ -102,10 +108,16 @@ int main(int argc, char **argv)
             
             double delta = 0.5;
             
+            // publish data of joins state to topic /Joints_state
             for(int i = 0; i<13; i++) JointState.position[i] = position_value[i];
             JointState.header.stamp = ros::Time::now(); 
-
             pub_for_rviz.publish(JointState);
+
+            // publish data of velocity and aceleration to visual on rpt_plot
+            vm_am.vmax = m_delta_robot->m_data_delta[0]->vel;
+            vm_am.amax = m_delta_robot->m_data_delta[0]->acel;
+            v_a_out.publish(vm_am);
+
             ros::Duration(delta).sleep();
 
             for (int i = 1; i < m_delta_robot->m_data_delta.size(); i++)
@@ -117,16 +129,24 @@ int main(int argc, char **argv)
                 
                 delta = m_delta_robot->m_data_delta[i]->tiempo * 10 - m_delta_robot->m_data_delta[i-1]->tiempo * 10;
                 
+                // publish data of joins state to topic /Joints_state
                 for(int i = 0; i<13; i++) JointState.position[i] = position_value[i];
                 JointState.header.stamp = ros::Time::now();
-
                 pub_for_rviz.publish(JointState);
+
+                // publish data of velocity and aceleration to visual on rpt_plot
+                vm_am.vmax = m_delta_robot->m_data_delta[i]->vel;
+                vm_am.amax = m_delta_robot->m_data_delta[i]->acel;
+                v_a_out.publish(vm_am);
+
                 ros::Duration(delta).sleep();
             }
 
+            // dump status
             msg.data = "from " + to_string(call_xo_2) + " " + to_string(call_yo_2) + " " + to_string(call_zo_2) + " to " + to_string(call_xf_2) + " " + to_string(call_yf_2) + " " + to_string(call_zf_2) + " is finished";
             status_to_node_b.publish(msg);
 
+            // delete contructor
             delete m_delta_robot;
 
             status = false;
@@ -159,8 +179,15 @@ void callback_linear_speed_xyz(const my_delta_robot::linear_speed_xyz::ConstPtr&
 
 void set_num_point_callback(const my_delta_robot::num_point::ConstPtr& msg)
 {
-    num_point_1 = msg->num_point_1;
-    num_point_2 = msg->num_point_2;
+    if(msg->num_point_1>0 && msg->num_point_2>0)
+    {
+        num_point_1 = msg->num_point_1;
+        num_point_2 = msg->num_point_2;
 
-    cout<<"set num_point_1 = "<<num_point_1<<" and num_point_2 = "<<num_point_2<<endl;
+        cout<<"set num_point_1 = "<<num_point_1<<" and num_point_2 = "<<num_point_2<<endl;
+    }
+    else
+    {
+        cout<<"ERORR to set num_point"<<endl;
+    }
 }

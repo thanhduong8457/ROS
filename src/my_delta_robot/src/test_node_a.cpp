@@ -61,17 +61,22 @@ int main(int argc, char **argv)
 
     ros::Rate loop_rate(1);
 
-    add_point(0.0, 100.0, -453.0, circle);
-    add_point(0.0, 100.0, -453.0, square);
-    add_point(0.0, 100.0, -453.0, triangle);
+    // add_point(0.0, 100.0, -453.0, circle);
+    // add_point(0.0, 100.0, -453.0, square);
+    // add_point(0.0, 100.0, -453.0, triangle);
 
-    add_point(0.0, 100.0, -453.0, circle);
-    add_point(0.0, 100.0, -453.0, square);
-    add_point(0.0, 100.0, -453.0, triangle);
+    // add_point(0.0, 100.0, -453.0, circle);
+    // add_point(0.0, 100.0, -453.0, square);
+    // add_point(0.0, 100.0, -453.0, triangle);
 
-    add_point(0.0, 100.0, -453.0, circle);
-    add_point(0.0, 100.0, -453.0, square);
-    add_point(0.0, 100.0, -453.0, triangle);
+    // add_point(0.0, 100.0, -453.0, circle);
+    // add_point(0.0, 100.0, -453.0, square);
+    // add_point(0.0, 100.0, -453.0, triangle);
+
+    for(int i = 0; i < 101; i++)
+    {
+        add_point(0.0, 100.0, -453.0, square);
+    }
 
     my_delta_robot::posicionxyz posicionxyz;
     status = true;

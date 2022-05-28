@@ -95,9 +95,29 @@ Thử thách 6 ngày 6 đêm về nhà, dù ba mẹ có đuổi lên lại SG m�
 
 rostopic pub -1 /status_to_image_node std_msgs/String -- "Done"
 
-rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 0.0 0.0 -375 1
+# set position of current point of robot delta
+rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 0.0 0.0 -375 -1
 
-rostopic pub -1 /set_num_point my_delta_robot/num_point -- 90 200
+# set start point grip distance
+rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 20.0 0.0 0.0 3
+
+# set end point grip distance
+rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 20.0 0.0 0.0 4
+
+# set start and end point grip distance
+rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 20.0 20.0 0.0 5
+
+# set position of circle point of robot delta when grip release
+rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 20.0 20.0 0.0 0
+
+# set position of square point of robot delta when grip release
+rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 20.0 20.0 0.0 1
+
+# set position of triangle point of robot delta when grip release
+rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 20.0 20.0 0.0 2
+
+# set numpoint 
+rostopic pub -1 /set_num_point my_delta_robot/num_point -- 120 200
 
 # set vmax and a max for robot
 rostopic pub -1 /set_vmax_amax my_delta_robot/vmax_amax -- 1500.0 200000.0
