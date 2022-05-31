@@ -62,7 +62,7 @@ int main(int argc, char **argv)
     my_delta_robot::linear_speed_xyz linear_speed_xyz;
     std_msgs::String msg;
 
-    //set default value
+    //setting default value
     x_current = 0.0;
     y_current = 0.0;
     z_current = -375.0;
