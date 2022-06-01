@@ -65,7 +65,7 @@ int main()
 
     r = 0;
 
-    for(int z_test =-375; z_test>=-480; z_test--)
+    for(int z_test = -375; z_test >= -480; z_test--)
     {
         cout<<"with z = "<<z_test<<endl;
         is_not_exit = true;
@@ -81,7 +81,7 @@ int main()
                 ry = r*sin(phi*dtr);
                 delta_calcInverse(rx, ry, z_test, theta_1, theta_2, theta_3);
                 cout<<theta_1<<" "<<theta_2<<" "<<theta_3<<endl;
-                if(theta_1<0||theta_2<0||theta_3<0)
+                if(theta_1<0 || theta_2<0 || theta_3<0)
                 {
                     is_not_exit = false;
                     cout<<"theta<0"<<endl;
