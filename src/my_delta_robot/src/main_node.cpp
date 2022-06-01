@@ -174,7 +174,16 @@ void callback_linear_speed_xyz(const my_delta_robot::linear_speed_xyz::ConstPtr&
 
     gripper = msg->gripper;
 
-    status = true;
+    if((call_xo_2 == call_xf_2) && (call_yo_2 == call_yf_2) && (call_zo_2 == call_zf_2))
+    {
+        cout<<"Start point and end Point is duplicate"<<endl;
+        status = false;
+    }
+    else
+    {
+        status = true;
+    }
+
 }
 
 void set_num_point_callback(const my_delta_robot::num_point::ConstPtr& msg)

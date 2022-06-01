@@ -8,7 +8,7 @@
 	<node name="rviz" pkg="rviz" type="rviz" args="−d $(find my_delta_robot)/rviz/my_config.rviz" required="true" />
 
 	<node name="main_node" pkg="my_delta_robot" type="main_node" output="screen"/>
-	<node name="node_b" pkg="my_delta_robot" type="node_b" output="screen"/>
+	<!-- <node name="node_b" pkg="my_delta_robot" type="node_b" output="screen"/>
 	<node name="node_a" pkg="my_delta_robot" type="node_a" output="screen"/>
-	<node name="serial_module" pkg="my_delta_robot" type="serial_module" />
+	<node name="serial_module" pkg="my_delta_robot" type="serial_module" /> -->
 </launch>

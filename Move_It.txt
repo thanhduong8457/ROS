@@ -107,6 +107,12 @@ rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 20.0 0.0 0.0 4
 # set start and end point grip distance
 rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 20.0 20.0 0.0 5
 
+# start to draw square if run node draw
+rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 0.0 0.0 0.0 6
+
+# start to draw triangle if run node draw
+rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 0.0 0.0 0.0 7
+
 # set position of circle point of robot delta when grip release
 rostopic pub -1 /set_current_point my_delta_robot/posicionxyz -- 20.0 20.0 0.0 0
 

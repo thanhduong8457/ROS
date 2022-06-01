@@ -32,16 +32,17 @@ enum{
     Z_START,
     Z_END,
     Z_START_END,
-    DRAW_SQUARE
+    DRAW_SQUARE,
+    DRAW_TRIANGLE
 };
 
 vector<point_t *> my_point;
-bool status;
-bool is_done;
+bool status(false);
+bool is_done(true);
 
-double vmax, amax;
+double vmax(10000.0), amax(100000.0);
 
-double x_current, y_current, z_current, z_start, z_end;
+double x_current(0.0), y_current(0.0), z_current(-375.0), z_start(25), z_end(50);
 
 double x_A, y_A, z_A;
 double x_B, y_B, z_B;
@@ -53,7 +54,7 @@ void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg);
 void set_vmax_amax_callback(const my_delta_robot::vmax_amax::ConstPtr& msg);
 void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg);
 void draw_new_square();
-
+void draw_new_triangle();
 
 int main(int argc, char **argv)
 {
@@ -74,33 +75,21 @@ int main(int argc, char **argv)
     std_msgs::String msg;
 
     //setting default value
-    x_current = 0.0;
-    y_current = 0.0;
-    z_current = -375.0;
-
-    x_A = -100.0;
-    y_A = -100.0;
+    x_A = 0.0;
+    y_A = z_end;
     z_A = -453.0;
 
-    x_B = 0.0;
-    y_B = -100.0;
+    x_B = -z_end;
+    y_B = 0.0;
     z_B = -453.0;
 
-    x_C = 100.0;
-    y_C = -100.0;
+    x_C = 0.0;
+    y_C = -z_end;
     z_C = -453.0;
 
-    x_D = 100.0;
-    y_D = -100.0;
+    x_D = z_end;
+    y_D = 0.0;
     z_D = -453.0;
-
-    z_start = 20;
-    z_end = 10;
-
-    vmax = 10000.0;
-    amax = 100000.0;
-
-    draw_new_square();
 
     while (ros::ok())
     {
@@ -186,12 +175,26 @@ void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg)
 
 void draw_new_square()
 {
+    cout<<"Draw Square"<<endl;
     add_point(x_current, y_current, z_current, 0);
-    add_point(x_A, y_A, z_A - z_end, 0);
-    add_point(x_B, y_B, z_B - z_end, 0);
-    add_point(x_C, y_C, z_C - z_end, 0);
-    add_point(x_D, y_D, z_D - z_end, 0);
-    add_point(x_A, y_A, z_A - z_end, 0);
+    add_point(x_A, y_A, z_A - z_start, 0);
+    add_point(x_B, y_B, z_B - z_start, 0);
+    add_point(x_C, y_C, z_C - z_start, 0);
+    add_point(x_D, y_D, z_D - z_start, 0);
+    add_point(x_A, y_A, z_A - z_start, 0);
+    add_point(x_current, y_current, z_current, 0);
+    
+    status = true;
+}
+
+void draw_new_triangle()
+{
+    cout<<"Draw Triangle"<<endl;
+    add_point(x_current, y_current, z_current, 0);
+    add_point(x_A, y_A, z_A - z_start, 0);
+    add_point(x_B, y_B, z_B - z_start, 0);
+    add_point(x_C, y_C, z_C - z_start, 0);
+    add_point(x_A, y_A, z_A - z_start, 0);
     add_point(x_current, y_current, z_current, 0);
     
     status = true;
@@ -255,6 +258,23 @@ void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg
     case (Z_END):
         z_end = msg->x0;
         cout<<"the distance to go down and grip when END is set to: "<<z_end<<endl;
+
+        x_A = 0.0;
+        y_A = z_end;
+        z_A = -453.0;
+
+        x_B = -z_end;
+        y_B = 0.0;
+        z_B = -453.0;
+
+        x_C = 0.0;
+        y_C = -z_end;
+        z_C = -453.0;
+
+        x_D = z_end;
+        y_D = 0.0;
+        z_D = -453.0;
+
         break;
 
     case (Z_START_END):
@@ -270,6 +290,15 @@ void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg
             draw_new_square();
             is_done = false;
         }
+        break;
+
+    case (DRAW_TRIANGLE):
+        if(is_done == true)
+        {
+            draw_new_triangle();
+            is_done = false;
+        }
+        break;
     
     default:
         break;

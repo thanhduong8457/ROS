@@ -146,9 +146,13 @@ add_executable(serial_module src/serial_module.cpp)
 target_link_libraries(serial_module ${catkin_LIBRARIES})
 add_dependencies(serial_module my_delta_robot_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
 
-add_executable(draw_square src/draw_square.cpp)
-target_link_libraries(draw_square ${catkin_LIBRARIES})
-add_dependencies(draw_square my_delta_robot_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
+add_executable(draw src/draw.cpp)
+target_link_libraries(draw ${catkin_LIBRARIES})
+add_dependencies(draw my_delta_robot_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
+
+add_executable(test_acuracy src/test_acuracy.cpp)
+target_link_libraries(test_acuracy ${catkin_LIBRARIES})
+add_dependencies(test_acuracy my_delta_robot_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}

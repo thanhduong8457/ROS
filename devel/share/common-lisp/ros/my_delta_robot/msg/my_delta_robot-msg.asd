@@ -1,0 +1,21 @@
+
+(cl:in-package :asdf)
+
+(defsystem "my_delta_robot-msg"
+  :depends-on (:roslisp-msg-protocol :roslisp-utils )
+  :components ((:file "_package")
+    (:file "PositionArm" :depends-on ("_package_PositionArm"))
+    (:file "_package_PositionArm" :depends-on ("_package"))
+    (:file "angulo" :depends-on ("_package_angulo"))
+    (:file "_package_angulo" :depends-on ("_package"))
+    (:file "image_pos" :depends-on ("_package_image_pos"))
+    (:file "_package_image_pos" :depends-on ("_package"))
+    (:file "linear_speed_xyz" :depends-on ("_package_linear_speed_xyz"))
+    (:file "_package_linear_speed_xyz" :depends-on ("_package"))
+    (:file "num_point" :depends-on ("_package_num_point"))
+    (:file "_package_num_point" :depends-on ("_package"))
+    (:file "posicionxyz" :depends-on ("_package_posicionxyz"))
+    (:file "_package_posicionxyz" :depends-on ("_package"))
+    (:file "vmax_amax" :depends-on ("_package_vmax_amax"))
+    (:file "_package_vmax_amax" :depends-on ("_package"))
+  ))

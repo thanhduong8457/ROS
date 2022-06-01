@@ -82,8 +82,8 @@ int main(int argc, char **argv)
     z_start = 20;
     z_end = 10;
 
-    vmax = 10000.0;
-    amax = 100000.0;
+    vmax = 15000.0;
+    amax = 130000.0;
 
     status = false;
     is_send_status_to_node_a = false;
