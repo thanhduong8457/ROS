@@ -10,30 +10,26 @@ using namespace std;
 
 serial::Serial ser;
 
-void write_callback(const std_msgs::String::ConstPtr& msg)
-{
+void write_callback(const std_msgs::String::ConstPtr& msg) {
     ROS_INFO_STREAM("Writing to serial port" << msg->data);
     ser.write(msg->data);
 }
 
-int main (int argc, char** argv)
-{
+int main (int argc, char** argv) {
     ros::init(argc, argv, "serial_example_node");
     ros::NodeHandle nh;
 
     ros::Subscriber write_sub = nh.subscribe("write", 1000, write_callback);
     ros::Publisher read_pub = nh.advertise<std_msgs::String>("read", 1000);
 
-    try
-    {
+    try {
         ser.setPort("/dev/ttyTHS1");
         ser.setBaudrate(115200);
         serial::Timeout to = serial::Timeout::simpleTimeout(1000);
         ser.setTimeout(to);
         ser.open();
     }
-    catch (serial::IOException& e)
-    {
+    catch (serial::IOException& e) {
         ROS_ERROR_STREAM("Unable to open port ");
         return -1;
     }
@@ -62,8 +58,7 @@ int main (int argc, char** argv)
 
     int temp_1 = 0, temp_2 = 0, temp_3 = 0;
 
-    while(ros::ok())
-    {
+    while(ros::ok()) {
         data_send.data = "{\"theta1\":\"" + to_string(temp_1) +
              "\",\"theta2\":\"" + to_string(temp_2) +
              "\",\"theta3\":\"" + to_string(temp_3) + "\"}\r\n";

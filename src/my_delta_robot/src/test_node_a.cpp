@@ -26,8 +26,7 @@ vector<point_t *> my_point;
 bool status;
 bool is_exit;
 
-void add_point(double x, double y, double z, int type)
-{
+void add_point(double x, double y, double z, int type) {
     point_t *data = NULL;
     data = new point_t;
 
@@ -39,20 +38,17 @@ void add_point(double x, double y, double z, int type)
     my_point.push_back(data);
 }
 
-void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg)
-{
+void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg) {
     ROS_INFO("status: [%s]", msg->data.c_str());
 
     if(my_point.size()!=0)  status = true;
 
-    if(my_point.size()==0)
-    {
+    if(my_point.size()==0) {
         is_exit = true;
     }
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     ros::init(argc, argv, "node_a");
     ros::NodeHandle nh;
 
@@ -73,8 +69,7 @@ int main(int argc, char **argv)
     // add_point(0.0, 100.0, -453.0, square);
     // add_point(0.0, 100.0, -453.0, triangle);
 
-    for(int i = 0; i < 101; i++)
-    {
+    for(int i = 0; i < 101; i++) {
         add_point(0.0, 100.0, -453.0, square);
     }
 
@@ -82,10 +77,8 @@ int main(int argc, char **argv)
     status = true;
     is_exit =  false;
 
-    while (ros::ok())
-    {
-        if(status)
-        {
+    while (ros::ok()) {
+        if(status) {
             posicionxyz.x0 = my_point[0]->position_x;
             posicionxyz.y0 = my_point[0]->position_y;
             posicionxyz.z0 = my_point[0]->position_z;
@@ -100,8 +93,7 @@ int main(int argc, char **argv)
             status = false;
         }
 
-        if(is_exit)
-        {
+        if(is_exit) {
             return 0;
         }
 

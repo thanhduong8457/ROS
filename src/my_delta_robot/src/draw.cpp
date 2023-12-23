@@ -56,8 +56,7 @@ void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg
 void draw_new_square();
 void draw_new_triangle();
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     ros::init(argc, argv, "node_b");
 
     ros::NodeHandle nh;
@@ -91,10 +90,8 @@ int main(int argc, char **argv)
     y_D = 0.0;
     z_D = -453.0;
 
-    while (ros::ok())
-    {
-        if(status)
-        {
+    while (ros::ok()) {
+        if(status) {
             linear_speed_xyz.xo = my_point[0]->position_x;
             linear_speed_xyz.yo = my_point[0]->position_y;
             linear_speed_xyz.zo = my_point[0]->position_z;
@@ -132,8 +129,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void add_point(double x, double y, double z, int gripper)
-{
+void add_point(double x, double y, double z, int gripper) {
     point_t *data = NULL;
     data = new point_t;
 
@@ -145,12 +141,10 @@ void add_point(double x, double y, double z, int gripper)
     my_point.push_back(data);
 }
 
-void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg)
-{
+void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg) {
     ROS_INFO("status from main_node: [%s]", msg->data.c_str());
 
-    if(my_point.size()==1)
-    {
+    if(my_point.size()==1) {
         x_current = my_point[0]->position_x;
         y_current = my_point[0]->position_y;
         z_current = my_point[0]->position_z;
@@ -165,16 +159,14 @@ void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg)
 
     }
 
-    if(my_point.size()!=0)
-    {
+    if(my_point.size()!=0) {
         status = true;
     }
 
 }
 
 
-void draw_new_square()
-{
+void draw_new_square() {
     cout<<"Draw Square"<<endl;
     add_point(x_current, y_current, z_current, 0);
     add_point(x_A, y_A, z_A - z_start, 0);
@@ -187,8 +179,7 @@ void draw_new_square()
     status = true;
 }
 
-void draw_new_triangle()
-{
+void draw_new_triangle() {
     cout<<"Draw Triangle"<<endl;
     add_point(x_current, y_current, z_current, 0);
     add_point(x_A, y_A, z_A - z_start, 0);
@@ -200,15 +191,13 @@ void draw_new_triangle()
     status = true;
 }
 
-void set_vmax_amax_callback(const my_delta_robot::vmax_amax::ConstPtr& msg)
-{
+void set_vmax_amax_callback(const my_delta_robot::vmax_amax::ConstPtr& msg) {
     vmax = msg->vmax;
     amax = msg->amax;
     cout<<"set vmax = "<<vmax<<", and set amax = "<<amax<<endl;
 }
 
-void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg)
-{
+void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg) {
     int temp = msg->type;
 
     switch (temp)
@@ -218,13 +207,11 @@ void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg
         y_current = msg->y0;
         z_current = msg->z0;
 
-        if(z_current>-375||z_current<-480)
-        {
+        if(z_current>-375||z_current<-480) {
             z_current = -375.0;
             cout<<"[ERROR] Invalid point, current point now set to x: "<<x_current<<" y: "<<y_current<<" z: "<<z_current<<endl;
         }
-        else
-        {
+        else {
             cout<<"current point set to point x: "<<x_current<<" y: "<<y_current<<" z: "<<z_current<<endl;
         }
         break;
@@ -285,16 +272,14 @@ void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg
         break;
     
     case (DRAW_SQUARE):
-        if(is_done == true)
-        {
+        if(is_done == true) {
             draw_new_square();
             is_done = false;
         }
         break;
 
     case (DRAW_TRIANGLE):
-        if(is_done == true)
-        {
+        if(is_done == true) {
             draw_new_triangle();
             is_done = false;
         }

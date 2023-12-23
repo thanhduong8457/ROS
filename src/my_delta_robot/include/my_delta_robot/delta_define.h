@@ -29,10 +29,10 @@ using namespace std::chrono; // nanoseconds, system_clock, seconds
 #define rf      200        // Base arm
 
 #define hf      299.99119987
-#define he		74.911197427
+#define he        74.911197427
 
 #define mmtm    0.001
-#define mtmm	1000
+#define mtmm    1000
 #define dtr     (pi/180)
 #define rtd     (180/pi)
 

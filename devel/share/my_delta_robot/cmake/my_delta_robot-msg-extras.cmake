@@ -1,2 +1,0 @@
-set(my_delta_robot_MESSAGE_FILES "/mnt/e/ROS/src/my_delta_robot/msg/angulo.msg;/mnt/e/ROS/src/my_delta_robot/msg/linear_speed_xyz.msg;/mnt/e/ROS/src/my_delta_robot/msg/posicionxyz.msg;/mnt/e/ROS/src/my_delta_robot/msg/PositionArm.msg;/mnt/e/ROS/src/my_delta_robot/msg/image_pos.msg;/mnt/e/ROS/src/my_delta_robot/msg/vmax_amax.msg;/mnt/e/ROS/src/my_delta_robot/msg/num_point.msg")
-set(my_delta_robot_SERVICE_FILES "")

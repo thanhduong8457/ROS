@@ -20,8 +20,7 @@ bool status;
 void callback_linear_speed_xyz(const my_delta_robot::linear_speed_xyz::ConstPtr& msg);
 void set_num_point_callback(const my_delta_robot::num_point::ConstPtr& msg);
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     ros::init(argc, argv, "main_node");
 
     ros::NodeHandle nh;
@@ -78,12 +77,10 @@ int main(int argc, char **argv)
     status = false;
     delta_robot *m_delta_robot = NULL;
 
-    while (ros::ok())
-    {
-        if(status)
-        {
+    while (ros::ok()) {
+        if(status) {
             // contruct a new delta_robot
-	        m_delta_robot = new delta_robot;
+            m_delta_robot = new delta_robot;
 
             ROS_INFO("v_max = %lf, a_max = %lf", call_vmax_2, call_amax_2);
 
@@ -120,8 +117,7 @@ int main(int argc, char **argv)
 
             ros::Duration(delta).sleep();
 
-            for (int i = 1; i < m_delta_robot->m_data_delta.size(); i++)
-            {
+            for (int i = 1; i < m_delta_robot->m_data_delta.size(); i++) {
                 m_delta_robot->angulos_eulerianos(m_delta_robot->m_data_delta[i]->tiempo*10, 
                     m_delta_robot->m_data_delta[i]->pos_x, m_delta_robot->m_data_delta[i]->pos_y, m_delta_robot->m_data_delta[i]->pos_z,
                     m_delta_robot->m_data_delta[i]->theta_1, m_delta_robot->m_data_delta[i]->theta_2, m_delta_robot->m_data_delta[i]->theta_3, 
@@ -159,8 +155,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void callback_linear_speed_xyz(const my_delta_robot::linear_speed_xyz::ConstPtr& msg)
-{
+void callback_linear_speed_xyz(const my_delta_robot::linear_speed_xyz::ConstPtr& msg) {
     call_xo_2 = msg->xo;
     call_yo_2 = msg->yo;
     call_zo_2 = msg->zo;
@@ -186,17 +181,14 @@ void callback_linear_speed_xyz(const my_delta_robot::linear_speed_xyz::ConstPtr&
 
 }
 
-void set_num_point_callback(const my_delta_robot::num_point::ConstPtr& msg)
-{
-    if(msg->num_point_1>0 && msg->num_point_2>0)
-    {
+void set_num_point_callback(const my_delta_robot::num_point::ConstPtr& msg) {
+    if(msg->num_point_1>0 && msg->num_point_2>0) {
         num_point_1 = msg->num_point_1;
         num_point_2 = msg->num_point_2;
 
         cout<<"set num_point_1 = "<<num_point_1<<" and num_point_2 = "<<num_point_2<<endl;
     }
-    else
-    {
+    else {
         cout<<"ERORR to set num_point"<<endl;
     }
 }

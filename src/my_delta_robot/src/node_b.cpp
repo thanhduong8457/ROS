@@ -43,8 +43,7 @@ void set_vmax_amax_callback(const my_delta_robot::vmax_amax::ConstPtr& msg);
 void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg);
 
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     ros::init(argc, argv, "node_b");
 
     ros::NodeHandle nh;
@@ -88,10 +87,8 @@ int main(int argc, char **argv)
     status = false;
     is_send_status_to_node_a = false;
 
-    while (ros::ok())
-    {
-        if(status)
-        {
+    while (ros::ok()) {
+        if(status) {
             linear_speed_xyz.xo = my_point[0]->position_x;
             linear_speed_xyz.yo = my_point[0]->position_y;
             linear_speed_xyz.zo = my_point[0]->position_z;
@@ -116,8 +113,7 @@ int main(int argc, char **argv)
             status = false;
         }
 
-        if(is_send_status_to_node_a == true)
-        {
+        if(is_send_status_to_node_a == true) {
             msg.data = "Point [" + to_string(xx) + " " + to_string(yy) + " " + to_string(zz) + "] is finished";
             status_to_node_a.publish(msg);
             
@@ -132,8 +128,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void add_point(double x, double y, double z, int gripper)
-{
+void add_point(double x, double y, double z, int gripper) {
     point_t *data = NULL;
     data = new point_t;
 
@@ -145,12 +140,10 @@ void add_point(double x, double y, double z, int gripper)
     my_point.push_back(data);
 }
 
-void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg)
-{
+void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg) {
     ROS_INFO("status from main_node: [%s]", msg->data.c_str());
 
-    if(my_point.size()==1)
-    {
+    if(my_point.size()==1) {
         x_current = my_point[0]->position_x;
         y_current = my_point[0]->position_y;
         z_current = my_point[0]->position_z;
@@ -165,12 +158,13 @@ void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg)
 
     }
 
-    if(my_point.size()!=0)  status = true;
+    if(my_point.size()!=0) {
+        status = true;
+    }
 
 }
 
-void node_a_callback(const my_delta_robot::posicionxyz::ConstPtr& msg)
-{
+void node_a_callback(const my_delta_robot::posicionxyz::ConstPtr& msg) {
     xx = msg->x0;
     yy = msg->y0;
     zz = msg->z0;
@@ -210,31 +204,26 @@ void node_a_callback(const my_delta_robot::posicionxyz::ConstPtr& msg)
     status = true;
 }
 
-void set_vmax_amax_callback(const my_delta_robot::vmax_amax::ConstPtr& msg)
-{
+void set_vmax_amax_callback(const my_delta_robot::vmax_amax::ConstPtr& msg) {
     vmax = msg->vmax;
     amax = msg->amax;
     cout<<"set vmax = "<<vmax<<", and set amax = "<<amax<<endl;
 }
 
-void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg)
-{
+void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg) {
     int temp = msg->type;
 
-    switch (temp)
-    {
+    switch (temp) {
     case (-1):
         x_current = msg->x0;
         y_current = msg->y0;
         z_current = msg->z0;
 
-        if(z_current>-375||z_current<-480)
-        {
+        if(z_current>-375||z_current<-480) {
             z_current = -375.0;
             cout<<"[ERROR] Invalid point, current point now set to x: "<<x_current<<" y: "<<y_current<<" z: "<<z_current<<endl;
         }
-        else
-        {
+        else {
             cout<<"current point set to point x: "<<x_current<<" y: "<<y_current<<" z: "<<z_current<<endl;
         }
         break;

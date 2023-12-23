@@ -33,13 +33,12 @@ typedef struct data_point{
 
 std::vector<data_point_t *> m_my_data;
 
-void add_data(int zz, int rr)
-{
-	data_point_t *data = NULL;
-	data = new data_point_t;
-	data->zz = zz;
-	data->rr = rr;
-	m_my_data.push_back(data);
+void add_data(int zz, int rr) {
+    data_point_t *data = NULL;
+    data = new data_point_t;
+    data->zz = zz;
+    data->rr = rr;
+    m_my_data.push_back(data);
 }
 
 double theta_1, theta_2, theta_3;
@@ -51,11 +50,10 @@ double delta_calcAngleYZ(double x0, double y0, double z0);
 void delta_calcInverse(double x0, double y0, double z0, double &theta1, double &theta2, double &theta3);
 void delta_calcForward(double theta1, double theta2, double theta3, double &x0, double &y0, double &z0);
 
-int main()
-{
+int main() {
     data_point mydata;
 
-	theta_1 = 0;
+    theta_1 = 0;
     theta_2 = 0;
     theta_3 = 0;
 
@@ -65,24 +63,20 @@ int main()
 
     r = 0;
 
-    for(int z_test = -375; z_test >= -480; z_test--)
-    {
+    for(int z_test = -375; z_test >= -480; z_test--) {
         cout<<"with z = "<<z_test<<endl;
         is_not_exit = true;
         r = 0;
 
-        while(is_not_exit)
-        {
+        while(is_not_exit) {
             r++;
             cout<<"increase r value: "<<r<<endl;
-            for(int phi = 0; phi <= 360; phi++)
-            {
+            for(int phi = 0; phi <= 360; phi++) {
                 rx = r*cos(phi*dtr);
                 ry = r*sin(phi*dtr);
                 delta_calcInverse(rx, ry, z_test, theta_1, theta_2, theta_3);
                 cout<<theta_1<<" "<<theta_2<<" "<<theta_3<<endl;
-                if(theta_1<0 || theta_2<0 || theta_3<0)
-                {
+                if(theta_1<0 || theta_2<0 || theta_3<0) {
                     is_not_exit = false;
                     cout<<"theta<0"<<endl;
                     break;
@@ -94,16 +88,14 @@ int main()
         cout<<z_test<<" "<<r<<endl;
     }
 
-    for(int i = 0; i<m_my_data.size(); i++)
-    {
+    for(int i = 0; i<m_my_data.size(); i++) {
         cout<<"With z = "<<m_my_data[i]->zz<<" we have rmax = "<<m_my_data[i]->rr<<endl;
     }
     
     cout<<endl;
 
     cout<<"[";
-    for(int i = 0; i<m_my_data.size(); i++)
-    {
+    for(int i = 0; i<m_my_data.size(); i++) {
         cout<<m_my_data[i]->zz<<" ";
     }
     cout<<"]";
@@ -111,20 +103,18 @@ int main()
     cout<<endl;
 
     cout<<"[";
-    for(int i = 0; i<m_my_data.size(); i++)
-    {
+    for(int i = 0; i<m_my_data.size(); i++) {
         cout<<m_my_data[i]->rr<<" ";
     }
     cout<<"]";
 
     
-	// cout<<"theta_1: "<<theta_1<<" theta_2: "<<theta_2<<" theta_3: "<<theta_3<<endl;
+    // cout<<"theta_1: "<<theta_1<<" theta_2: "<<theta_2<<" theta_3: "<<theta_3<<endl;
 
-	return 0;
+    return 0;
 }
 
-double delta_calcAngleYZ(double x0, double y0, double z0)
-{
+double delta_calcAngleYZ(double x0, double y0, double z0) {
     double y1 = -0.5 * 0.57735 * ff; // f/2 * tg 30
     y0 -= 0.5 * 0.57735 * ee;    // shift center to edge
                                  // z = a + b*y
@@ -142,15 +132,13 @@ double delta_calcAngleYZ(double x0, double y0, double z0)
 
 // inverse kinematics: (x0, y0, z0) -> (theta1, theta2, theta3)
 // returned status: 0=OK, -1=non-existing position
-void delta_calcInverse(double x0, double y0, double z0, double &theta1, double &theta2, double &theta3)
-{
+void delta_calcInverse(double x0, double y0, double z0, double &theta1, double &theta2, double &theta3) {
     theta1 = delta_calcAngleYZ(x0, y0, z0);
     theta2 = delta_calcAngleYZ(x0 * cos120 + y0 * sin120, y0 * cos120 - x0 * sin120, z0);  // rotate  to +119 deg
     theta3 = delta_calcAngleYZ(x0 * cos120 - y0 * sin120, y0 * cos120 + x0 * sin120, z0);  // rotate to -120 deg
 }
 
-void delta_calcForward(double theta1, double theta2, double theta3, double &x0, double &y0, double &z0)
-{
+void delta_calcForward(double theta1, double theta2, double theta3, double &x0, double &y0, double &z0) {
     double t = (ff - ee) * tan30 / 2;
 
     theta1 *= dtr;
@@ -189,9 +177,8 @@ void delta_calcForward(double theta1, double theta2, double theta3, double &x0, 
 
     // discriminant
     double d = b * b - (double)4.0 * a * c;
-    if (d < 0)
-    {
-		return; // non-existing point
+    if (d < 0) {
+        return; // non-existing point
     }
 
     z0 = -0.5 * (b + sqrt(d)) / a;

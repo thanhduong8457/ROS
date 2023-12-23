@@ -24,10 +24,8 @@ typedef struct joint{
 
 vector<joint_t *> my_joint;
 
-void init_joint()
-{
-  for(int i=0; i <= 12; i++)
-  {
+void init_joint() {
+  for(int i=0; i <= 12; i++) {
     joint_t *joint_temp = NULL;
     joint_temp = new joint_t;
     joint_temp->name = "";
@@ -37,8 +35,7 @@ void init_joint()
   }
 }
 
-void show_infor()
-{
+void show_infor() {
   std_msgs::String data_send;
 
   float theta_1 = my_joint[0]->position*180/pi;
@@ -57,8 +54,7 @@ void show_infor()
   cout<<data_send.data;
 }
 
-void MoveGroupCallback(const sensor_msgs::JointState::ConstPtr& msg)
-{
+void MoveGroupCallback(const sensor_msgs::JointState::ConstPtr& msg) {
   for(int i=0; i<=12; i++)
   {
     my_joint[i]->name = msg->name[i];
@@ -67,18 +63,16 @@ void MoveGroupCallback(const sensor_msgs::JointState::ConstPtr& msg)
   show_infor();
 }
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
   init_joint();
-	ros::init(argc, argv, "serial_module");
+    ros::init(argc, argv, "serial_module");
 
-	ros::NodeHandle nh;
+    ros::NodeHandle nh;
 
-	ros::Subscriber sub = nh.subscribe("/joint_states", 1000, MoveGroupCallback);
+    ros::Subscriber sub = nh.subscribe("/joint_states", 1000, MoveGroupCallback);
   ros::Publisher chatter_pub = nh.advertise<my_delta_robot::PositionArm>("thanhduong", 1000);
 
-  try
-  {
+  try {
     //ser.setPort("/dev/ttyS7");
     ser.setPort("/dev/ttyTHS1");
     ser.setBaudrate(115200);
@@ -125,7 +119,7 @@ int main(int argc, char** argv)
   }
   
   //ros::spin();
-	return 0;
+    return 0;
 }
 
 

@@ -26,8 +26,7 @@ vector<point_t *> my_point;
 bool status;
 bool is_exit;
 
-void add_point(double x, double y, double z, int type)
-{
+void add_point(double x, double y, double z, int type) {
     point_t *data = NULL;
     data = new point_t;
 
@@ -39,20 +38,17 @@ void add_point(double x, double y, double z, int type)
     my_point.push_back(data);
 }
 
-void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg)
-{
+void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg) {
     ROS_INFO("status: [%s]", msg->data.c_str());
 
     if(my_point.size()!=0)  status = true;
 
-    if(my_point.size()==0)
-    {
+    if(my_point.size()==0) {
         is_exit = true;
     }
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     ros::init(argc, argv, "node_a");
     ros::NodeHandle nh;
 
