@@ -126,7 +126,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(include ${catkin_INCLUDE_DIRS} include/my_delta_robot)
 
-add_executable(main_node src/main_node.cpp include/my_delta_robot/codos.cpp include/my_delta_robot/delta_robot.cpp)
+add_executable(main_node src/main_node.cpp include/my_delta_robot/common.cpp include/my_delta_robot/delta_robot.cpp)
 target_link_libraries(main_node ${catkin_LIBRARIES})
 add_dependencies(main_node my_delta_robot_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
 

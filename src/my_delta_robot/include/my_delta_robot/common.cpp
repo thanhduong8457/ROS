@@ -1,4 +1,4 @@
-#include "codos.h"
+#include "common.h"
 
 //Starting points
 double A1[3] = {(hf * mmtm) / 3, 0, 0};
@@ -20,18 +20,18 @@ void punto_codo(double theta, double (&b1)[3]) {
 }
 
 //|------------------------------------------|
-//|-------------- rotacion120 ---------------|
+//|-------------- rotation120 ---------------|
 //|------------------------------------------|
-void rotacion120(double ent[3], double(&sal)[3]) {
+void rotation120(double ent[3], double(&sal)[3]) {
     sal[0] = cos120 * ent[0] + sin120 * ent[1];
     sal[1] = -sin120 * ent[0] + cos120 * ent[1];
     sal[2] = ent[2];
 }
 
 //|------------------------------------------|
-//|---------------- rotacion240 -------------|
+//|---------------- rotation240 -------------|
 //|------------------------------------------|
-void rotacion240(double ent[3],double (&sal)[3]) {
+void rotation240(double ent[3],double (&sal)[3]) {
     sal[0] = cos240 * ent[0] + sin240 * ent[1];
     sal[1] = -sin240 * ent[0] + cos240 * ent[1];
     sal[2] = ent[2];
@@ -50,8 +50,8 @@ void punto_ee(double eee[3], int brazo, double (&sal)[3]) {
     double vhe3[3] = { 0, 0, 0 };
     double vhe1[3] = { 0, 0, 0 };
 
-    rotacion120(vhe2, vhe3);
-    rotacion120(vhe3, vhe1);
+    rotation120(vhe2, vhe3);
+    rotation120(vhe3, vhe1);
 
     if (brazo == 2) sumav(eee, vhe2, sal);
     else if (brazo == 3) sumav(eee, vhe3, sal);
@@ -78,12 +78,12 @@ void angulos_codo(double codo[3], double eee[3], int brazo, double &ang_a, doubl
     double _codo[3] = {};
     double _eee[3] = {};
     if (brazo == 3) {
-        rotacion240(codo, _codo);
-        rotacion240(eee, _eee);
+        rotation240(codo, _codo);
+        rotation240(eee, _eee);
     }
     else if (brazo == 1) {        
-        rotacion120(codo, _codo);
-        rotacion120(eee, _eee);
+        rotation120(codo, _codo);
+        rotation120(eee, _eee);
     }
     else {
         for (int i = 0; i < 3; i++) {
@@ -102,8 +102,8 @@ void angulos_codo(double codo[3], double eee[3], int brazo, double &ang_a, doubl
     }
 
     //prep
-    rotacion_y(_codo, ang_a, _codo);
-    rotacion_y(_eee, ang_a, _eee);
+    rotation_y(_codo, ang_a, _codo);
+    rotation_y(_eee, ang_a, _eee);
 
     //calc
     if ((_codo[0] - _eee[0]) != 0) {
@@ -116,9 +116,9 @@ void angulos_codo(double codo[3], double eee[3], int brazo, double &ang_a, doubl
 }
 
 //|------------------------------------------|
-//|-------------- rotacion_y ----------------|
+//|-------------- rotation_y ----------------|
 //|------------------------------------------|
-void rotacion_y(double ent[3], double ang, double (&sal)[3]) {
+void rotation_y(double ent[3], double ang, double (&sal)[3]) {
     sal[0] = ent[0] * cos(ang) - ent[2] * sin(ang);
     sal[1] = ent[1];
     sal[2] = -ent[0] * sin(ang) + ent[2] * cos(ang);

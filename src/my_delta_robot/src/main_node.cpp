@@ -8,8 +8,9 @@
 #include "delta_define.h"
 #include "delta_robot.h"
 
-double call_xo_2, call_yo_2, call_zo_2;
-double call_xf_2, call_yf_2, call_zf_2;
+Point point0;
+Point pointf;
+
 double call_vmax_2, call_amax_2;
 
 int num_point_1, num_point_2;
@@ -76,19 +77,16 @@ int main(int argc, char **argv) {
 
     status = false;
     delta_robot *m_delta_robot = NULL;
+    m_delta_robot = new delta_robot; // contruct a new delta_robot
+    m_delta_robot->vmax = call_vmax_2;
+    m_delta_robot->amax = call_amax_2;
 
     while (ros::ok()) {
         if(status) {
-            // contruct a new delta_robot
-            m_delta_robot = new delta_robot;
+            ROS_INFO("v_max = %lf, a_max = %lf", m_delta_robot->vmax, m_delta_robot->amax);
 
-            ROS_INFO("v_max = %lf, a_max = %lf", call_vmax_2, call_amax_2);
-
-            //path_linear_speed(xx, yy, zz, x, y, z);
-            m_delta_robot->system_linear(call_xo_2, call_yo_2, call_zo_2, call_xf_2, call_yf_2, call_zf_2, dis, rot_z, rot_y, theta_y, theta_z, rot_tras);
-
-            // Trapezoidal velocity profile
-            m_delta_robot->ls_v_a_total(0, dis, call_vmax_2, call_amax_2, num_point_1, num_point_2);
+            m_delta_robot->system_linear(point0, pointf, dis, rot_z, rot_y, theta_y, theta_z, rot_tras);
+            m_delta_robot->trapezoidal_velocity_profile(0, dis, num_point_1, num_point_2); // Trapezoidal velocity profile
 
             // Reverse rotation end point, start point and trajectory #######
             m_delta_robot->system_linear_matrix(m_delta_robot->m_data_delta.size(), rot_z, rot_y, theta_y, theta_z, rot_tras);
@@ -99,9 +97,11 @@ int main(int argc, char **argv) {
             ROS_INFO("Creating Linear Path RVIZ!");
 
             m_delta_robot->angulos_eulerianos(1, 
-                m_delta_robot->m_data_delta[0]->pos_x, m_delta_robot->m_data_delta[0]->pos_y, m_delta_robot->m_data_delta[0]->pos_z,
-                m_delta_robot->m_data_delta[0]->theta_1, m_delta_robot->m_data_delta[0]->theta_2, m_delta_robot->m_data_delta[0]->theta_3, 
-                gripper, position_value);
+                m_delta_robot->m_data_delta[0]->position_val,
+                m_delta_robot->m_data_delta[0]->theta_val,
+                gripper, 
+                position_value
+            );
             
             double delta = 0.5;
             
@@ -118,12 +118,15 @@ int main(int argc, char **argv) {
             ros::Duration(delta).sleep();
 
             for (int i = 1; i < m_delta_robot->m_data_delta.size(); i++) {
-                m_delta_robot->angulos_eulerianos(m_delta_robot->m_data_delta[i]->tiempo*10, 
-                    m_delta_robot->m_data_delta[i]->pos_x, m_delta_robot->m_data_delta[i]->pos_y, m_delta_robot->m_data_delta[i]->pos_z,
-                    m_delta_robot->m_data_delta[i]->theta_1, m_delta_robot->m_data_delta[i]->theta_2, m_delta_robot->m_data_delta[i]->theta_3, 
-                    gripper, position_value);
+                m_delta_robot->angulos_eulerianos(
+                    m_delta_robot->m_data_delta[i]->time_point*10, 
+                    m_delta_robot->m_data_delta[i]->position_val,
+                    m_delta_robot->m_data_delta[i]->theta_val,
+                    gripper, 
+                    position_value
+                );
                 
-                delta = m_delta_robot->m_data_delta[i]->tiempo * 10 - m_delta_robot->m_data_delta[i-1]->tiempo * 10;
+                delta = m_delta_robot->m_data_delta[i]->time_point * 10 - m_delta_robot->m_data_delta[i-1]->time_point * 10;
                 
                 // publish data of joins state to topic /Joints_state
                 for(int i = 0; i<13; i++) JointState.position[i] = position_value[i];
@@ -139,11 +142,10 @@ int main(int argc, char **argv) {
             }
 
             // dump status
-            msg.data = "from " + to_string(call_xo_2) + " " + to_string(call_yo_2) + " " + to_string(call_zo_2) + " to " + to_string(call_xf_2) + " " + to_string(call_yf_2) + " " + to_string(call_zf_2) + " is finished";
+            msg.data = "from " + to_string(point0.x) + " " + to_string(point0.y) + " " + to_string(point0.z) + " to " + to_string(pointf.x) + " " + to_string(pointf.y) + " " + to_string(pointf.z) + " is finished";
             status_to_node_b.publish(msg);
 
             // delete contructor
-            delete m_delta_robot;
 
             status = false;
         }
@@ -152,35 +154,38 @@ int main(int argc, char **argv) {
         ros::spinOnce();
     }
 
+    delete m_delta_robot;
     return 0;
 }
 
+/// @brief 
+/// @param msg 
 void callback_linear_speed_xyz(const my_delta_robot::linear_speed_xyz::ConstPtr& msg) {
-    call_xo_2 = msg->xo;
-    call_yo_2 = msg->yo;
-    call_zo_2 = msg->zo;
+    point0.x = msg->xo;
+    point0.y = msg->yo;
+    point0.z = msg->zo;
 
-    call_xf_2 = msg->xf;
-    call_yf_2 = msg->yf;
-    call_zf_2 = msg->zf;
+    pointf.x = msg->xf;
+    pointf.y = msg->yf;
+    pointf.z = msg->zf;
 
     call_vmax_2 = msg->vmax;
     call_amax_2 = msg->amax;
 
     gripper = msg->gripper;
 
-    if((call_xo_2 == call_xf_2) && (call_yo_2 == call_yf_2) && (call_zo_2 == call_zf_2))
-    {
+    if((point0.x == pointf.x) && (point0.y == pointf.y) && (point0.z == pointf.z)) {
         cout<<"Start point and end Point is duplicate"<<endl;
         status = false;
     }
-    else
-    {
+    else {
         status = true;
     }
 
 }
 
+/// @brief 
+/// @param msg 
 void set_num_point_callback(const my_delta_robot::num_point::ConstPtr& msg) {
     if(msg->num_point_1>0 && msg->num_point_2>0) {
         num_point_1 = msg->num_point_1;
