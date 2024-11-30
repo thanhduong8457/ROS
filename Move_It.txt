@@ -22,22 +22,6 @@ https://www.youtube.com/watch?v=IS3JIV45rh0
 https://www.youtube.com/watch?v=xt7HtHjXo4s
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
-Hello,Robotics in a Nutshell,
-
-My name is Le Thanh Duong, I'm a student from Viet Nam. During this time I have a project related about control a Delta Robot using MoveIt.
-
-I have watched your video about how to export URDF files from Solidworks and It's very helpful for me,thank you so much for your video. 
-
-I tried to export URDF files for my Delta Robot but I have a problem. Because Delta Robot is a parallel Robot that is different from the Robot in the video so I didn't know how to configure it in the right way.
-Could you help me to check and export the URDF file from it. I have attached the Delta Robot file in the link below.
-
-Thank you and best regards,
-
-Le Thanh Duong.
-
-https://drive.google.com/drive/folders/1dkKLpW3TJ-d8IFZL--MVkz4yFkIa4taS?usp=sharing
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
 Simplified Delta Robot Kinematic Equations
 https://www.youtube.com/watch?v=FTRCwuAnr6o&list=RDCMUCpTuKJrXFwybnpOG7HpTpZw&index=2
 https://www.marginallyclever.com/other/samples/fk-ik-test.html

@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/thanhduong/Documents/Embeded_Project/ROS/src/my_delta_robot/src",
+      "program": "/Users/thanhduong/Documents/Embeded_Project/ROS/src/my_delta_robot/src/build/Debug/outDebug"
+    }
+  ]
+}
