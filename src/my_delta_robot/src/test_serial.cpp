@@ -16,8 +16,10 @@ void write_callback(const std_msgs::String::ConstPtr& msg) {
 }
 
 int main (int argc, char** argv) {
-    ros::init(argc, argv, "serial_example_node");
-    ros::NodeHandle nh;
+    // ros::init(argc, argv, "serial_example_node");
+    // ros::NodeHandle nh;
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("serial_example_node");
 
     ros::Subscriber write_sub = nh.subscribe("write", 1000, write_callback);
     ros::Publisher read_pub = nh.advertise<std_msgs::String>("read", 1000);
@@ -41,7 +43,8 @@ int main (int argc, char** argv) {
     
     // while(ros::ok()){
 
-    //     ros::spinOnce();
+    //     //    ros::spinOnce();
+    rclcpp::spin_some(node);
 
     //     if(ser.available()){
     //         ROS_INFO_STREAM("Reading from serial port");
@@ -73,7 +76,8 @@ int main (int argc, char** argv) {
         if(temp_2>100) temp_2 = 0;
         if(temp_3>100) temp_3 = 0;
 
-        ros::spinOnce();
+        //    ros::spinOnce();
+    rclcpp::spin_some(node);
         loop_rate.sleep();
     }
 }

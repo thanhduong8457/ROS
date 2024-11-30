@@ -3,8 +3,10 @@
 #include <vector>
 #include <stdio.h>
 
-#include "ros/ros.h"
-#include "std_msgs/String.h"
+//#include "ros/ros.h"
+#include "rclcpp/rclcpp.hpp"
+//#include "std_msgs/String.h"
+#include "std_msgs/msg/string.hpp"
 #include "my_delta_robot/posicionxyz.h"
 
 using namespace std;
@@ -49,8 +51,10 @@ void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg) {
 }
 
 int main(int argc, char **argv) {
-    ros::init(argc, argv, "node_a");
-    ros::NodeHandle nh;
+    // ros::init(argc, argv, "node_a");
+    // ros::NodeHandle nh;
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("node_a");
 
     ros::Subscriber sub_status_delta = nh.subscribe("status_to_node_a", 1000, Status_Delta_Callback);
     ros::Publisher chatter_pub = nh.advertise<my_delta_robot::posicionxyz>("send_to_node_b", 1000);
@@ -78,7 +82,8 @@ int main(int argc, char **argv) {
     status = true;
     is_exit =  false;
 
-    while (ros::ok())
+    //  while (ros::ok())
+  while (rclcpp::ok())
     {
         if(status)
         {
@@ -101,7 +106,8 @@ int main(int argc, char **argv) {
             return 0;
         }
 
-        ros::spinOnce();
+        //    ros::spinOnce();
+    rclcpp::spin_some(node);
     }
 
     return 0;

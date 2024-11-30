@@ -2,7 +2,8 @@
 #include <map>
 #include <math.h>
 
-#include "ros/ros.h"
+//#include "ros/ros.h"
+#include "rclcpp/rclcpp.hpp"
 #include "beginner_tutorials/GetDistance.h"
 #include "Odomcallback.h"//subcriber
 
@@ -76,10 +77,11 @@ private:
     double y_;
 }
 
-int main(int argc, char **argv)
-{
-    ros::init(argc, argv, "landmark_monitor");
-    ros::NodeHandle nh;
+int main(int argc, char **argv) {
+    // ros::init(argc, argv, "landmark_monitor");
+    // ros::NodeHandle nh;
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("talker");
 
     LandmarkMonitor monitor;
 

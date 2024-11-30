@@ -3,8 +3,10 @@
 #include <vector>
 #include <stdio.h>
 
-#include "ros/ros.h"
-#include "std_msgs/String.h"
+//#include "ros/ros.h"
+#include "rclcpp/rclcpp.hpp"
+//#include "std_msgs/String.h"
+#include "std_msgs/msg/string.hpp"
 #include "my_delta_robot/linear_speed_xyz.h"
 #include "my_delta_robot/posicionxyz.h"
 #include "my_delta_robot/vmax_amax.h"
@@ -57,9 +59,10 @@ void draw_new_square();
 void draw_new_triangle();
 
 int main(int argc, char **argv) {
-    ros::init(argc, argv, "node_b");
-
-    ros::NodeHandle nh;
+    // ros::init(argc, argv, "node_b");
+    // ros::NodeHandle nh;
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("node_b");
 
     ros::Subscriber set_vmax_amax = nh.subscribe("set_vmax_amax", 1000, set_vmax_amax_callback);
     ros::Subscriber set_current_point = nh.subscribe("set_current_point", 1000, set_current_point_callback);
@@ -71,7 +74,8 @@ int main(int argc, char **argv) {
     ros::Rate loop_rate(1);
 
     my_delta_robot::linear_speed_xyz linear_speed_xyz;
-    std_msgs::String msg;
+    //  std_msgs::String msg;
+  std_msgs::msg::String msg;
 
     //setting default value
     x_A = 0.0;
@@ -90,7 +94,8 @@ int main(int argc, char **argv) {
     y_D = 0.0;
     z_D = -453.0;
 
-    while (ros::ok()) {
+    //  while (ros::ok())
+  while (rclcpp::ok()) {
         if(status) {
             linear_speed_xyz.xo = my_point[0]->position_x;
             linear_speed_xyz.yo = my_point[0]->position_y;
@@ -122,7 +127,8 @@ int main(int argc, char **argv) {
         //     is_done = false;
         // }
 
-        ros::spinOnce();
+        //    ros::spinOnce();
+    rclcpp::spin_some(node);
     }
 
     //ros::spin();

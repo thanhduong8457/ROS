@@ -3,8 +3,10 @@
 #include <vector>
 #include <stdio.h>
 
-#include "ros/ros.h"
-#include "std_msgs/String.h"
+//#include "ros/ros.h"
+#include "rclcpp/rclcpp.hpp"
+//#include "std_msgs/String.h"
+#include "std_msgs/msg/string.hpp"
 #include "my_delta_robot/image_pos.h"
 #include "my_delta_robot/posicionxyz.h"
 
@@ -32,8 +34,11 @@ void status_delta_callback(const std_msgs::String::ConstPtr& msg);
 void data_image_callback(const my_delta_robot::image_pos::ConstPtr& msg);
 
 int main(int argc, char **argv) {
-    ros::init(argc, argv, "node_a");
-    ros::NodeHandle nh;
+    // ros::init(argc, argv, "node_a");
+    // ros::NodeHandle nh;
+
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("node_a");
 
     ros::Subscriber data_image = nh.subscribe("data_image", 1000, data_image_callback);
     ros::Subscriber sub_status_delta = nh.subscribe("status_to_node_a", 1000, status_delta_callback);
@@ -44,12 +49,14 @@ int main(int argc, char **argv) {
     ros::Rate loop_rate(1);
 
     my_delta_robot::posicionxyz posicionxyz;
-    std_msgs::String msg;
+    //  std_msgs::String msg;
+  std_msgs::msg::String msg;
 
     status = false;
     is_send_status_to_image_node =  false;
 
-    while (ros::ok()) {
+    //  while (ros::ok())
+  while (rclcpp::ok()) {
         if(status) {
             posicionxyz.x0 = my_point[0]->position_x;
             posicionxyz.y0 = my_point[0]->position_y;
@@ -72,7 +79,8 @@ int main(int argc, char **argv) {
             is_send_status_to_image_node = false;
         }
 
-        ros::spinOnce();
+        //    ros::spinOnce();
+    rclcpp::spin_some(node);
     }
 
     return 0;

@@ -1,6 +1,8 @@
-#include "ros/ros.h"
+//#include "ros/ros.h"
+#include "rclcpp/rclcpp.hpp"
 // #include "std_msgs/msg/string.hpp"
-#include "std_msgs/String.h"
+//#include "std_msgs/String.h"
+#include "std_msgs/msg/string.hpp"
 #include "my_delta_robot/linear_speed_xyz.h"
 #include "my_delta_robot/num_point.h"
 #include "sensor_msgs/JointState.h"
@@ -23,13 +25,14 @@ void callback_linear_speed_xyz(const my_delta_robot::linear_speed_xyz::ConstPtr&
 void set_num_point_callback(const my_delta_robot::num_point::ConstPtr& msg);
 
 int main(int argc, char **argv) {
-    ros::init(argc, argv, "main_node");
-
-    ros::NodeHandle nh;
+    // ros::init(argc, argv, "main_node");
+    // ros::NodeHandle nh;
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("main_node");
 
     // ##################  Subscriber  ##################
-    ros::Subscriber receive_node_a = nh.subscribe("input_ls_final", 1000, callback_linear_speed_xyz);
-    ros::Subscriber set_num_point = nh.subscribe("set_num_point", 1000, set_num_point_callback);
+    auto receive_node_a = node->create_subscribe("input_ls_final", 1000, callback_linear_speed_xyz);
+    auto set_num_point = nh.subscribe("set_num_point", 1000, set_num_point_callback);
 
     // ##################  Publisher  ##################
     ros::Publisher pub_for_rviz = nh.advertise<sensor_msgs::JointState>("joint_states", 1000);
@@ -48,7 +51,8 @@ int main(int argc, char **argv) {
     double rot_tras[4][4] ={0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     double position_value[13] = {};
 
-    std_msgs::String msg;
+    //  std_msgs::String msg;
+  std_msgs::msg::String msg;
     sensor_msgs::JointState JointState;
     my_delta_robot::vmax_amax vm_am;
 
@@ -82,7 +86,8 @@ int main(int argc, char **argv) {
     m_delta_robot->vmax = call_vmax_2;
     m_delta_robot->amax = call_amax_2;
 
-    while (ros::ok()) {
+    //  while (ros::ok())
+  while (rclcpp::ok()) {
         if(status) {
             ROS_INFO("v_max = %lf, a_max = %lf", m_delta_robot->vmax, m_delta_robot->amax);
 
@@ -152,7 +157,8 @@ int main(int argc, char **argv) {
         }
 
         loop_rate.sleep();
-        ros::spinOnce();
+        //    ros::spinOnce();
+    rclcpp::spin_some(node);
     }
 
     delete m_delta_robot;

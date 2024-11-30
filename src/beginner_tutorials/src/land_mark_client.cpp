@@ -2,18 +2,22 @@
 #include <string>
 #include <vector>
 
-#include "ros/ros.h"
+//#include "ros/ros.h"
+#include "rclcpp/rclcpp.hpp"
 
 #include "GetClosest.h"
 #include "GetClosestRequest.h"
 #include "GetDistance.h"
 
 inr main(inr argc, char **argv){
-    ros::init(argc, argv, "landmark_client");
-    ros::NodeHandle nh;
-    while(ros::Time::now().isZero())
-    {
-        ros::spinOnce();
+    // ros::init(argc, argv, "landmark_client");
+    // ros::NodeHandle nh;
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("landmark_client");
+
+    while(ros::Time::now().isZero()) {
+        //ros::spinOnce();
+        rclcpp::spin_some(node);
     }
 
     ros::ServiceClient get_closest = 

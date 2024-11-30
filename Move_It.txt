@@ -30,15 +30,6 @@ https://www.marginallyclever.com/other/samples/fk-ik-test.html
 roslaunch panda_moveit_config demo.launch rviz_tutorial:=true
 
 roslaunch moveit_setup_assistant setup_assistant.launch
-
-Create package:
-	catkin_create_pkg my_delta_robot std_msgs rospy roscpp
-
-Build package:
-	$ catkin_make --only-pkg-with-deps [package_name]
-	
-	catkin_make --only-pkg-with-deps beginner_tutorials
-	catkin_make --only-pkg-with-deps my_delta_robot
 	
 	rosdep check rqt_graph
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT

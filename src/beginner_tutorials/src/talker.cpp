@@ -3,8 +3,10 @@
 #include "beginner_tutorials/PID.h"
 #include "beginner_tutorials/fuzzy_ctrl.h"
 
-#include "ros/ros.h"
-#include "std_msgs/String.h"
+//#include "ros/ros.h"
+#include "rclcpp/rclcpp.hpp"
+//#include "std_msgs/String.h"
+#include "std_msgs/msg/string.hpp"
 #include "beginner_tutorials/Monitor.h"
 
 /*##################################################################################*/
@@ -50,14 +52,16 @@ double plant_motor(double uk)
 }
 /*##################################################################################*/
 
-int main(int argc, char **argv)
-{
-    ros::init(argc, argv, "talker");
-    ros::NodeHandle n;
+int main(int argc, char **argv) {
+    // ros::init(argc, argv, "talker");
+    // ros::NodeHandle n;
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("talker");
 
-    ros::Publisher chatter_pub = n.advertise<beginner_tutorials::Monitor>("thanhduong", 1000);
-
-    ros::Rate loop_rate(50);
+    // ros::Publisher chatter_pub = n.advertise<beginner_tutorials::Monitor>("thanhduong", 1000);
+    // ros::Rate loop_rate(50);
+    auto chatter_pub = node->create_publisher<beginner_tutorials::Monitor>("thanhduong", 1000);
+    rclcpp::Rate loop_rate(10);
 
     PID *pid;
     pid = new PID(8, 4, 5, 0.01, "auto");
@@ -69,7 +73,8 @@ int main(int argc, char **argv)
 
     int count = 0;
 
-    while (ros::ok())
+    //  while (ros::ok())
+  while (rclcpp::ok())
     {
         count++;
         ref = set_ref(1000, count);
@@ -91,11 +96,13 @@ int main(int argc, char **argv)
         y = plant_motor(u);
 
         /*##################################################################################*/
-        // std_msgs::String msg;
+        // //  std_msgs::String msg;
+  std_msgs::msg::String msg;
         // std::stringstream ss;
         // ss << "ref: " << ref << "  y: " << y;
         // msg.data = ss.str();
-        // ROS_INFO("%s", msg.data.c_str());
+        // //    ROS_INFO("%s", msg.data.c_str());
+    RCLCPP_INFO(node->get_logger(), "%s\n", msg.data.c_str());
 
         std::cout << "  ref: " << ref << "  y: " << y << "  ";
         pid->show_info();
@@ -106,7 +113,8 @@ int main(int argc, char **argv)
         Monitor.y = y;
 
         chatter_pub.publish(Monitor);
-        ros::spinOnce();
+        //    ros::spinOnce();
+    rclcpp::spin_some(node);
         loop_rate.sleep();
     }
     return 0;

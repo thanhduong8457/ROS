@@ -3,7 +3,8 @@
 #include <vector>
 #include <stdio.h>
 
-#include "ros/ros.h"
+//#include "ros/ros.h"
+#include "rclcpp/rclcpp.hpp"
 // #include "sensor_msgs/sensor_msgs/msg/joint_state.hpp"
 #include "sensor_msgs/JointState.h"
 #include "my_delta_robot/PositionArm.h"
@@ -71,18 +72,18 @@ void MoveGroupCallback(const sensor_msgs::JointState::ConstPtr &msg)
     show_infor();
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     init_joint();
-    ros::init(argc, argv, "serial_module");
+    // ros::init(argc, argv, "serial_module");
+    // ros::NodeHandle nh;
 
-    ros::NodeHandle nh;
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("serial_module");
 
     ros::Subscriber sub = nh.subscribe("/joint_states", 1000, MoveGroupCallback);
     ros::Publisher chatter_pub = nh.advertise<my_delta_robot::PositionArm>("thanhduong", 1000);
 
-    try
-    {
+    try {
         // ser.setPort("/dev/ttyS7");
         ser.setPort("/dev/ttyTHS1");
         ser.setBaudrate(115200);
@@ -105,7 +106,8 @@ int main(int argc, char **argv)
 
     my_delta_robot::PositionArm PositionArm;
 
-    while (ros::ok())
+    //  while (ros::ok())
+  while (rclcpp::ok())
     {
         PositionArm.base_brazo1 = my_joint[0]->position;
         PositionArm.base_brazo2 = my_joint[1]->position;
@@ -127,7 +129,8 @@ int main(int argc, char **argv)
         chatter_pub.publish(PositionArm);
 
         loop_rate.sleep();
-        ros::spinOnce();
+        //    ros::spinOnce();
+    rclcpp::spin_some(node);
     }
 
     // ros::spin();
