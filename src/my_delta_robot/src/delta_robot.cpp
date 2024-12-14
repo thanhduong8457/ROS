@@ -531,7 +531,8 @@ Point delta_robot::delta_calcForward(Theta theta) {
     // discriminant
     double d = b * b - (double)4.0 * a * c;
     if (d < 0) {
-        return; // non-existing point
+        std::cout << "ERROR" << std::endl;
+        return return_point; // non-existing point
     }
 
     return_point.z = -0.5 * (b + sqrt(d)) / a;
@@ -664,7 +665,7 @@ void delta_robot::angulos_eulerianos(
     double temp[3] = {};
     double p3[3] = {};
     punto_codo(theta.angle3, temp);
-    rotacion120(temp, c3);
+    rotation120(temp, c3);
     punto_ee(punto, 3, p3);
 
     double a3_a, a3_b;
@@ -673,8 +674,8 @@ void delta_robot::angulos_eulerianos(
     double c1[3] = {};
     double p1[3] = {};
     punto_codo(theta.angle1, c1);
-    rotacion120(c1, temp);
-    rotacion120(temp, c1);
+    rotation120(c1, temp);
+    rotation120(temp, c1);
     punto_ee(punto, 1, p1);
 
     double a1_a, a1_b;

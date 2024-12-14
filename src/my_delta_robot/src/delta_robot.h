@@ -13,7 +13,7 @@ typedef struct Point {
         y = 0;
         z = 0;
     }
-}point_t;
+}Point_t;
 
 typedef struct Theta {
     double angle1;
@@ -24,7 +24,7 @@ typedef struct Theta {
         angle2 = 0;
         angle3 = 0;
     }
-}point_t;
+}Theta_t;
 
 typedef struct data_delta {
     double pos;     //

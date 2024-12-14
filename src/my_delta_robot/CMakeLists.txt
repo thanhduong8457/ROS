@@ -5,20 +5,59 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Add the directory containing Findserial.cmake to CMAKE_MODULE_PATH
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(urdf REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
+# find_package(serial REQUIRED)
 
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()
+include_directories(${Python3_NumPy_INCLUDE_DIRS})
+# include_directories(${serial_INCLUDE_DIRS})
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/Angulo.msg"
+  "msg/LinearSpeedXYZ.msg"
+  "msg/Posicionxyz.msg"
+  "msg/PositionArm.msg"
+  "msg/ImagePos.msg"
+  "msg/VmaxAmax.msg"
+  "msg/NumPoint.msg"
+  DEPENDENCIES geometry_msgs
+)
+
+include_directories(include ${ament_INCLUDE_DIRS})
+
+add_executable(main_node src/main_node.cpp src/common.cpp src/delta_robot.cpp)
+ament_target_dependencies(main_node rclcpp std_msgs sensor_msgs urdf geometry_msgs)
+rosidl_target_interfaces(main_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+add_executable(node_b src/node_b.cpp)
+ament_target_dependencies(node_b rclcpp std_msgs sensor_msgs urdf geometry_msgs)
+rosidl_target_interfaces(node_b ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+add_executable(node_a src/node_a.cpp)
+ament_target_dependencies(node_a rclcpp std_msgs sensor_msgs urdf geometry_msgs)
+rosidl_target_interfaces(node_a ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+# add_executable(serial_module src/serial_module.cpp)
+# ament_target_dependencies(serial_module rclcpp std_msgs sensor_msgs urdf geometry_msgs)
+# rosidl_target_interfaces(serial_module ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# target_link_libraries(serial_module ${serial_LIBRARIES})
+
+add_executable(draw src/draw.cpp)
+ament_target_dependencies(draw rclcpp std_msgs sensor_msgs urdf geometry_msgs)
+rosidl_target_interfaces(draw ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+add_executable(test_acuracy src/test_acuracy.cpp)
+ament_target_dependencies(test_acuracy rclcpp std_msgs sensor_msgs urdf geometry_msgs)
+rosidl_target_interfaces(test_acuracy ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 ament_package()

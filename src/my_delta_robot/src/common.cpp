@@ -31,7 +31,7 @@ void rotation120(double ent[3], double(&sal)[3]) {
 //|------------------------------------------|
 //|---------------- rotation240 -------------|
 //|------------------------------------------|
-void rotation240(double ent[3],double (&sal)[3]) {
+void rotation240(double ent[3], double(&sal)[3]) {
     sal[0] = cos240 * ent[0] + sin240 * ent[1];
     sal[1] = -sin240 * ent[0] + cos240 * ent[1];
     sal[2] = ent[2];
@@ -118,7 +118,7 @@ void angulos_codo(double codo[3], double eee[3], int brazo, double &ang_a, doubl
 //|------------------------------------------|
 //|-------------- rotation_y ----------------|
 //|------------------------------------------|
-void rotation_y(double ent[3], double ang, double (&sal)[3]) {
+void rotation_y(double ent[3], double ang, double(&sal)[3]) {
     sal[0] = ent[0] * cos(ang) - ent[2] * sin(ang);
     sal[1] = ent[1];
     sal[2] = -ent[0] * sin(ang) + ent[2] * cos(ang);

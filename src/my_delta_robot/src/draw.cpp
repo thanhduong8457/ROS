@@ -1,32 +1,30 @@
 #include <iostream>
-#include <string.h>
+#include <string>
 #include <vector>
 #include <stdio.h>
 
-//#include "ros/ros.h"
 #include "rclcpp/rclcpp.hpp"
-//#include "std_msgs/String.h"
 #include "std_msgs/msg/string.hpp"
-#include "my_delta_robot/linear_speed_xyz.h"
-#include "my_delta_robot/posicionxyz.h"
-#include "my_delta_robot/vmax_amax.h"
+#include "my_delta_robot/msg/linear_speed_xyz.hpp"
+#include "my_delta_robot/msg/posicionxyz.hpp"
+#include "my_delta_robot/msg/vmax_amax.hpp"
 
 using namespace std;
 
-typedef struct point{
-  double position_x;
-  double position_y;
-  double position_z;
-  int gripper;
-}point_t;
+typedef struct point {
+    double position_x;
+    double position_y;
+    double position_z;
+    int gripper;
+} point_t;
 
-enum{
+enum {
     circle = 0,
     square,
     triangle
 };
 
-enum{
+enum {
     CURRENT_POINT = -1,
     CIRCLE_POSITION = 0,
     SQUARE_POSITION,
@@ -51,33 +49,33 @@ double x_B, y_B, z_B;
 double x_C, y_C, z_C;
 double x_D, y_D, z_D;
 
-void add_point(double x, double y, double z);
-void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg);
-void set_vmax_amax_callback(const my_delta_robot::vmax_amax::ConstPtr& msg);
-void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg);
+void add_point(double x, double y, double z, int gripper);
+void Status_Delta_Callback(const std_msgs::msg::String::SharedPtr msg);
+void set_vmax_amax_callback(const my_delta_robot::msg::VmaxAmax::SharedPtr msg);
+void set_current_point_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg);
 void draw_new_square();
 void draw_new_triangle();
 
 int main(int argc, char **argv) {
-    // ros::init(argc, argv, "node_b");
-    // ros::NodeHandle nh;
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("node_b");
 
-    ros::Subscriber set_vmax_amax = nh.subscribe("set_vmax_amax", 1000, set_vmax_amax_callback);
-    ros::Subscriber set_current_point = nh.subscribe("set_current_point", 1000, set_current_point_callback);
-    ros::Subscriber sub_status_delta = nh.subscribe("status_delta", 1000, Status_Delta_Callback);
+    auto set_vmax_amax = node->create_subscription<my_delta_robot::msg::VmaxAmax>(
+        "set_vmax_amax", 10, set_vmax_amax_callback);
+    auto set_current_point = node->create_subscription<my_delta_robot::msg::Posicionxyz>(
+        "set_current_point", 10, set_current_point_callback);
+    auto sub_status_delta = node->create_subscription<std_msgs::msg::String>(
+        "status_delta", 10, Status_Delta_Callback);
 
-    ros::Publisher chatter_pub = nh.advertise<my_delta_robot::linear_speed_xyz>("input_ls_final", 1000);
-    ros::Publisher status_to_node_a = nh.advertise<std_msgs::String>("status_to_node_a", 1000);
+    auto chatter_pub = node->create_publisher<my_delta_robot::msg::LinearSpeedXYZ>("input_ls_final", 10);
+    auto status_to_node_a = node->create_publisher<std_msgs::msg::String>("status_to_node_a", 10);
 
-    ros::Rate loop_rate(1);
+    rclcpp::Rate loop_rate(1);
 
-    my_delta_robot::linear_speed_xyz linear_speed_xyz;
-    //  std_msgs::String msg;
-  std_msgs::msg::String msg;
+    my_delta_robot::msg::LinearSpeedXYZ linear_speed_xyz;
+    std_msgs::msg::String msg;
 
-    //setting default value
+    // Setting default values
     x_A = 0.0;
     y_A = z_end;
     z_A = -453.0;
@@ -94,9 +92,8 @@ int main(int argc, char **argv) {
     y_D = 0.0;
     z_D = -453.0;
 
-    //  while (ros::ok())
-  while (rclcpp::ok()) {
-        if(status) {
+    while (rclcpp::ok()) {
+        if (status) {
             linear_speed_xyz.xo = my_point[0]->position_x;
             linear_speed_xyz.yo = my_point[0]->position_y;
             linear_speed_xyz.zo = my_point[0]->position_z;
@@ -111,33 +108,25 @@ int main(int argc, char **argv) {
             linear_speed_xyz.gripper = my_point[0]->gripper;
 
             loop_rate.sleep();
-            chatter_pub.publish(linear_speed_xyz);
+            chatter_pub->publish(linear_speed_xyz);
 
-            cout<<"move from: "<<my_point[0]->position_x<<" "<<my_point[0]->position_y<<" "<<my_point[0]->position_z<<" to: "<<my_point[1]->position_x<<" "<<my_point[1]->position_y<<" "<<my_point[1]->position_z<<endl;
+            cout << "move from: " << my_point[0]->position_x << " " << my_point[0]->position_y << " " << my_point[0]->position_z
+                 << " to: " << my_point[1]->position_x << " " << my_point[1]->position_y << " " << my_point[1]->position_z << endl;
 
-            delete [] my_point[0];
+            delete my_point[0];
             my_point.erase(my_point.begin());
 
             status = false;
         }
 
-        // if(is_done == true)
-        // {
-        //     draw_new_square();
-        //     is_done = false;
-        // }
-
-        //    ros::spinOnce();
-    rclcpp::spin_some(node);
+        rclcpp::spin_some(node);
     }
 
-    //ros::spin();
     return 0;
 }
 
 void add_point(double x, double y, double z, int gripper) {
-    point_t *data = NULL;
-    data = new point_t;
+    point_t *data = new point_t;
 
     data->position_x = x;
     data->position_y = y;
@@ -147,33 +136,28 @@ void add_point(double x, double y, double z, int gripper) {
     my_point.push_back(data);
 }
 
-void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg) {
-    ROS_INFO("status from main_node: [%s]", msg->data.c_str());
+void Status_Delta_Callback(const std_msgs::msg::String::SharedPtr msg) {
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "status from main_node: [%s]", msg->data.c_str());
 
-    if(my_point.size()==1) {
+    if (my_point.size() == 1) {
         x_current = my_point[0]->position_x;
         y_current = my_point[0]->position_y;
         z_current = my_point[0]->position_z;
 
         my_point.clear();
 
-        //cout<<"x_current: "<<x_current<<" y_current: "<<y_current<<" z_current: "<<z_current<<endl;
-
         is_done = true;
 
-        cout<<endl;
-
+        cout << endl;
     }
 
-    if(my_point.size()!=0) {
+    if (!my_point.empty()) {
         status = true;
     }
-
 }
 
-
 void draw_new_square() {
-    cout<<"Draw Square"<<endl;
+    cout << "Draw Square" << endl;
     add_point(x_current, y_current, z_current, 0);
     add_point(x_A, y_A, z_A - z_start, 0);
     add_point(x_B, y_B, z_B - z_start, 0);
@@ -181,76 +165,74 @@ void draw_new_square() {
     add_point(x_D, y_D, z_D - z_start, 0);
     add_point(x_A, y_A, z_A - z_start, 0);
     add_point(x_current, y_current, z_current, 0);
-    
+
     status = true;
 }
 
 void draw_new_triangle() {
-    cout<<"Draw Triangle"<<endl;
+    cout << "Draw Triangle" << endl;
     add_point(x_current, y_current, z_current, 0);
     add_point(x_A, y_A, z_A - z_start, 0);
     add_point(x_B, y_B, z_B - z_start, 0);
     add_point(x_C, y_C, z_C - z_start, 0);
     add_point(x_A, y_A, z_A - z_start, 0);
     add_point(x_current, y_current, z_current, 0);
-    
+
     status = true;
 }
 
-void set_vmax_amax_callback(const my_delta_robot::vmax_amax::ConstPtr& msg) {
+void set_vmax_amax_callback(const my_delta_robot::msg::VmaxAmax::SharedPtr msg) {
     vmax = msg->vmax;
     amax = msg->amax;
-    cout<<"set vmax = "<<vmax<<", and set amax = "<<amax<<endl;
+    cout << "set vmax = " << vmax << ", and set amax = " << amax << endl;
 }
 
-void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg) {
+void set_current_point_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
     int temp = msg->type;
 
-    switch (temp)
-    {
+    switch (temp) {
     case (CURRENT_POINT):
         x_current = msg->x0;
         y_current = msg->y0;
         z_current = msg->z0;
 
-        if(z_current>-375||z_current<-480) {
+        if (z_current > -375 || z_current < -480) {
             z_current = -375.0;
-            cout<<"[ERROR] Invalid point, current point now set to x: "<<x_current<<" y: "<<y_current<<" z: "<<z_current<<endl;
-        }
-        else {
-            cout<<"current point set to point x: "<<x_current<<" y: "<<y_current<<" z: "<<z_current<<endl;
+            cout << "[ERROR] Invalid point, current point now set to x: " << x_current << " y: " << y_current << " z: " << z_current << endl;
+        } else {
+            cout << "current point set to point x: " << x_current << " y: " << y_current << " z: " << z_current << endl;
         }
         break;
-    
+
     case (CIRCLE_POSITION):
         x_A = msg->x0;
         y_A = msg->y0;
         z_A = msg->z0;
-        cout<<"Position to put CIRCLE is set to x: "<<x_A<<" y: "<<y_A<<" z: "<<z_A<<endl;
+        cout << "Position to put CIRCLE is set to x: " << x_A << " y: " << y_A << " z: " << z_A << endl;
         break;
 
     case (SQUARE_POSITION):
         x_B = msg->x0;
         y_B = msg->y0;
         z_B = msg->z0;
-        cout<<"Position to put SQUARE is set to x: "<<x_B<<" y: "<<y_B<<" z: "<<z_B<<endl;
+        cout << "Position to put SQUARE is set to x: " << x_B << " y: " << y_B << " z: " << z_B << endl;
         break;
 
     case (TRIANGLE):
         x_C = msg->x0;
         y_C = msg->y0;
         z_C = msg->z0;
-        cout<<"Position to put TRIANGLE is set to x: "<<x_C<<" y: "<<y_C<<" z: "<<z_C<<endl;
+        cout << "Position to put TRIANGLE is set to x: " << x_C << " y: " << y_C << " z: " << z_C << endl;
         break;
 
     case (Z_START):
         z_start = msg->x0;
-        cout<<"the distance to go down and grip when START is set to: "<<z_start<<endl;
+        cout << "The distance to go down and grip when START is set to: " << z_start << endl;
         break;
 
     case (Z_END):
         z_end = msg->x0;
-        cout<<"the distance to go down and grip when END is set to: "<<z_end<<endl;
+        cout << "The distance to go down and grip when END is set to: " << z_end << endl;
 
         x_A = 0.0;
         y_A = z_end;
@@ -273,24 +255,24 @@ void set_current_point_callback(const my_delta_robot::posicionxyz::ConstPtr& msg
     case (Z_START_END):
         z_start = msg->x0;
         z_end = msg->y0;
-        cout<<"the distance to go down and grip when START is set to: "<<z_start<<endl;
-        cout<<"the distance to go down and grip when END is set to: "<<z_end<<endl;
+        cout << "The distance to go down and grip when START is set to: " << z_start << endl;
+        cout << "The distance to go down and grip when END is set to: " << z_end << endl;
         break;
-    
+
     case (DRAW_SQUARE):
-        if(is_done == true) {
+        if (is_done == true) {
             draw_new_square();
             is_done = false;
         }
         break;
 
     case (DRAW_TRIANGLE):
-        if(is_done == true) {
+        if (is_done == true) {
             draw_new_triangle();
             is_done = false;
         }
         break;
-    
+
     default:
         break;
     }

@@ -1,24 +1,22 @@
 #include <iostream>
-#include <string.h>
+#include <string>
 #include <vector>
 #include <stdio.h>
 
-//#include "ros/ros.h"
 #include "rclcpp/rclcpp.hpp"
-//#include "std_msgs/String.h"
 #include "std_msgs/msg/string.hpp"
-#include "my_delta_robot/posicionxyz.h"
+#include "my_delta_robot/msg/posicionxyz.hpp"
 
 using namespace std;
 
-typedef struct point{
-  double position_x;
-  double position_y;
-  double position_z;
-  int type;
-}point_t;
+typedef struct point {
+    double position_x;
+    double position_y;
+    double position_z;
+    int type;
+} point_t;
 
-enum{
+enum {
     circle = 0,
     square,
     triangle
@@ -29,9 +27,7 @@ bool status;
 bool is_exit;
 
 void add_point(double x, double y, double z, int type) {
-    point_t *data = NULL;
-    data = new point_t;
-
+    point_t *data = new point_t;
     data->position_x = x;
     data->position_y = y;
     data->position_z = z;
@@ -40,74 +36,57 @@ void add_point(double x, double y, double z, int type) {
     my_point.push_back(data);
 }
 
-void Status_Delta_Callback(const std_msgs::String::ConstPtr& msg) {
-    ROS_INFO("status: [%s]", msg->data.c_str());
+void Status_Delta_Callback(const std_msgs::msg::String::SharedPtr msg) {
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "status: [%s]", msg->data.c_str());
 
-    if(my_point.size()!=0)  status = true;
+    if (!my_point.empty()) {
+        status = true;
+    }
 
-    if(my_point.size()==0) {
+    if (my_point.empty()) {
         is_exit = true;
     }
 }
 
 int main(int argc, char **argv) {
-    // ros::init(argc, argv, "node_a");
-    // ros::NodeHandle nh;
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("node_a");
 
-    ros::Subscriber sub_status_delta = nh.subscribe("status_to_node_a", 1000, Status_Delta_Callback);
-    ros::Publisher chatter_pub = nh.advertise<my_delta_robot::posicionxyz>("send_to_node_b", 1000);
+    auto sub_status_delta = node->create_subscription<std_msgs::msg::String>(
+        "status_to_node_a", 10, Status_Delta_Callback);
+    auto chatter_pub = node->create_publisher<my_delta_robot::msg::Posicionxyz>("send_to_node_b", 10);
 
-    ros::Rate loop_rate(1);
+    rclcpp::Rate loop_rate(1);
 
-    // add_point(0.0, 100.0, -453.0, circle);
-    // add_point(0.0, 100.0, -453.0, square);
-    // add_point(0.0, 100.0, -453.0, triangle);
-
-    // add_point(0.0, 100.0, -453.0, circle);
-    // add_point(0.0, 100.0, -453.0, square);
-    // add_point(0.0, 100.0, -453.0, triangle);
-
-    // add_point(0.0, 100.0, -453.0, circle);
-    // add_point(0.0, 100.0, -453.0, square);
-    // add_point(0.0, 100.0, -453.0, triangle);
-
-    for(int i = 0; i < 101; i++)
-    {
+    for (int i = 0; i < 101; i++) {
         add_point(0.0, 100.0, -453.0, square);
     }
 
-    my_delta_robot::posicionxyz posicionxyz;
+    my_delta_robot::msg::Posicionxyz posicionxyz;
     status = true;
-    is_exit =  false;
+    is_exit = false;
 
-    //  while (ros::ok())
-  while (rclcpp::ok())
-    {
-        if(status)
-        {
+    while (rclcpp::ok()) {
+        if (status) {
             posicionxyz.x0 = my_point[0]->position_x;
             posicionxyz.y0 = my_point[0]->position_y;
             posicionxyz.z0 = my_point[0]->position_z;
             posicionxyz.type = my_point[0]->type;
 
             loop_rate.sleep();
-            chatter_pub.publish(posicionxyz);
+            chatter_pub->publish(posicionxyz);
 
-            delete [] my_point[0];
+            delete my_point[0];
             my_point.erase(my_point.begin());
 
             status = false;
         }
 
-        if(is_exit)
-        {
+        if (is_exit) {
             return 0;
         }
 
-        //    ros::spinOnce();
-    rclcpp::spin_some(node);
+        rclcpp::spin_some(node);
     }
 
     return 0;

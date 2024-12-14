@@ -19,14 +19,6 @@
 #moveit:
 	http://docs.ros.org/en/melodic/api/moveit_tutorials/html/doc/quickstart_in_rviz/quickstart_in_rviz_tutorial.html
 
-	
-##%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%##
-- to reboot WSL, open powershell with admin and run this command:
-	Get-Service LxssManager | Restart-Service
-
-- power command help me successfully upgrade WSL 20.04 from WSL 18.04
-	sudo apt-get purge snapd
-
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 https://www.udemy.com/course/mastering-rtos-hands-on-with-freertos-arduino-and-stm32fx/learn/lecture/25694576#overview 
@@ -36,15 +28,11 @@ NEMA 23 Stepper Motor
 
 
 
-
-
-
-
 # Udemy guide ROS2: 
 https://banvien.udemy.com/course/ros2-for-beginners/learn/lecture/21305600#overview
 
 # path to document
-https://docs.ros.org/en/iron/Tutorials/Beginner-CLI-Tools/Introducing-Turtlesim/Introducing-Turtlesim.html
+https://docs.ros.org/en/humble/index.html
 
 # command create package: 
 ros2 pkg create NAME_OF_PAKAGE --build-type ament_python/ament_cmake --dependencies /rclcpp
@@ -53,14 +41,29 @@ ros2 pkg create urdf_tutorial --build-type ament_cmake --dependencies rclcpp
 ros2 pkg create beginner_tutorials --build-type ament_cmake --dependencies rclcpp
 ros2 pkg create my_delta_robot --build-type ament_cmake --dependencies rclcpp
 
+ros2 pkg create --build-type ament_cmake --license Apache-2.0 my_delta_robot
+
+
 # build specific package with command: 
 colcon build --packages-select NAME_OF_PAKAGE
 colcon build --packages-select my_cpp_pkg
 colcon build --packages-select my_py_pkg
 colcon build --packages-select urdf_tutorial
 
+colcon build --packages-select my_delta_robot
+
+colcon build --symlink-install \
+  -DPython3_EXECUTABLE:INTERNAL=$CONDA_PREFIX/bin/python3 \
+  -DPython3_FIND_STRATEGY=LOCATION -DPython3_FIND_UNVERSIONED_NAMES=FIRST
+
+# when we use the vitual env for build the package, the specify in percific python is required for building the package
+colcon build --symlink-install --cmake-args -DPython3_FIND_VIRTUALENV=ONLY --packages-select my_delta_robot
+
 beginner_tutorials
 my_delta_robot
+
+# testing build message by command
+ros2 interface show my_delta_robot/msg/Angulo
 
 # install tool with specific verison: 
 pip3 install setuptools==58.2.0 (setuptools is the name of the tool)

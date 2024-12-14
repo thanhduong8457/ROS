@@ -7,8 +7,7 @@
 #define __PID_H__
 #include <iostream>
 #include <string>
-class PID
-{
+class PID {
 private:
     float Kp;
     float Ki;

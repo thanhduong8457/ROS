@@ -1,25 +1,23 @@
 #include <iostream>
-#include <string.h>
+#include <string>
 #include <vector>
 #include <stdio.h>
 
-//#include "ros/ros.h"
 #include "rclcpp/rclcpp.hpp"
-//#include "std_msgs/String.h"
 #include "std_msgs/msg/string.hpp"
-#include "my_delta_robot/image_pos.h"
-#include "my_delta_robot/posicionxyz.h"
+#include "my_delta_robot/msg/image_pos.hpp"
+#include "my_delta_robot/msg/posicionxyz.hpp"
 
 using namespace std;
 
-typedef struct point{
-  double position_x;
-  double position_y;
-  double position_z;
-  int type;
-}point_t;
+typedef struct point {
+    double position_x;
+    double position_y;
+    double position_z;
+    int type;
+} point_t;
 
-enum{
+enum {
     circle = 0,
     square,
     triangle
@@ -30,65 +28,59 @@ bool status;
 bool is_send_status_to_image_node;
 
 void add_point(double x, double y, double z, int type);
-void status_delta_callback(const std_msgs::String::ConstPtr& msg);
-void data_image_callback(const my_delta_robot::image_pos::ConstPtr& msg);
+void status_delta_callback(const std_msgs::msg::String::SharedPtr msg);
+void data_image_callback(const my_delta_robot::msg::ImagePos::SharedPtr msg);
 
 int main(int argc, char **argv) {
-    // ros::init(argc, argv, "node_a");
-    // ros::NodeHandle nh;
-
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("node_a");
 
-    ros::Subscriber data_image = nh.subscribe("data_image", 1000, data_image_callback);
-    ros::Subscriber sub_status_delta = nh.subscribe("status_to_node_a", 1000, status_delta_callback);
+    auto data_image = node->create_subscription<my_delta_robot::msg::ImagePos>(
+        "data_image", 10, data_image_callback);
+    auto sub_status_delta = node->create_subscription<std_msgs::msg::String>(
+        "status_to_node_a", 10, status_delta_callback);
 
-    ros::Publisher chatter_pub = nh.advertise<my_delta_robot::posicionxyz>("send_to_node_b", 1000);
-    ros::Publisher status_to_image_node = nh.advertise<std_msgs::String>("status_to_image_node", 1000);
+    auto chatter_pub = node->create_publisher<my_delta_robot::msg::Posicionxyz>("send_to_node_b", 10);
+    auto status_to_image_node = node->create_publisher<std_msgs::msg::String>("status_to_image_node", 10);
 
-    ros::Rate loop_rate(1);
+    rclcpp::Rate loop_rate(1);
 
-    my_delta_robot::posicionxyz posicionxyz;
-    //  std_msgs::String msg;
-  std_msgs::msg::String msg;
+    my_delta_robot::msg::Posicionxyz posicionxyz;
+    std_msgs::msg::String msg;
 
     status = false;
-    is_send_status_to_image_node =  false;
+    is_send_status_to_image_node = false;
 
-    //  while (ros::ok())
-  while (rclcpp::ok()) {
-        if(status) {
+    while (rclcpp::ok()) {
+        if (status) {
             posicionxyz.x0 = my_point[0]->position_x;
             posicionxyz.y0 = my_point[0]->position_y;
             posicionxyz.z0 = my_point[0]->position_z;
             posicionxyz.type = my_point[0]->type;
 
             loop_rate.sleep();
-            chatter_pub.publish(posicionxyz);
+            chatter_pub->publish(posicionxyz);
 
-            delete [] my_point[0];
+            delete my_point[0];
             my_point.erase(my_point.begin());
 
             status = false;
         }
 
-        if(is_send_status_to_image_node)
-        {
+        if (is_send_status_to_image_node) {
             msg.data = "Done";
-            status_to_image_node.publish(msg);
+            status_to_image_node->publish(msg);
             is_send_status_to_image_node = false;
         }
 
-        //    ros::spinOnce();
-    rclcpp::spin_some(node);
+        rclcpp::spin_some(node);
     }
 
     return 0;
 }
 
 void add_point(double x, double y, double z, int type) {
-    point_t *data = NULL;
-    data = new point_t;
+    point_t *data = new point_t;
 
     data->position_x = x;
     data->position_y = y;
@@ -98,22 +90,22 @@ void add_point(double x, double y, double z, int type) {
     my_point.push_back(data);
 }
 
-void status_delta_callback(const std_msgs::String::ConstPtr& msg) {
-    ROS_INFO("status: [%s]", msg->data.c_str());
+void status_delta_callback(const std_msgs::msg::String::SharedPtr msg) {
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "status: [%s]", msg->data.c_str());
 
-    if(my_point.size()!=0) {
+    if (!my_point.empty()) {
         status = true;
     }
-    if(my_point.size()==0) {
+    if (my_point.empty()) {
         is_send_status_to_image_node = true;
     }
 }
 
-void data_image_callback(const my_delta_robot::image_pos::ConstPtr& msg) {
-    ROS_INFO("receive status from camera");
-    for(int i = 0; i<msg->x.size(); i++) {
+void data_image_callback(const my_delta_robot::msg::ImagePos::SharedPtr msg) {
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "receive status from camera");
+    for (size_t i = 0; i < msg->x.size(); i++) {
         add_point(msg->x[i], msg->y[i], msg->z[i], msg->type[i]);
-        cout<<"point: "<<msg->x[i]<<" "<<msg->y[i]<<" "<<msg->z[i]<<" "<<msg->type[i]<<" has been added."<<endl;
+        cout << "point: " << msg->x[i] << " " << msg->y[i] << " " << msg->z[i] << " " << msg->type[i] << " has been added." << endl;
     }
-    status  = true;
+    status = true;
 }
