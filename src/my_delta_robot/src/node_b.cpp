@@ -2,6 +2,9 @@
 #include <string>
 #include <vector>
 #include <stdio.h>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -25,8 +28,6 @@ enum {
 };
 
 vector<point_t *> my_point;
-bool status;
-bool is_send_status_to_node_a;
 
 double vmax, amax;
 
@@ -36,24 +37,28 @@ double x_circle, y_circle, z_circle;
 double x_square, y_square, z_square;
 double x_triangle, y_triangle, z_triangle;
 
+std::mutex mProcessingMutex;
+std::condition_variable mConditionProcess;
+std::atomic<bool> mSignalScheduleSwitch(false);
+
 void add_point(double x, double y, double z, int gripper);
 void Status_Delta_Callback(const std_msgs::msg::String::SharedPtr msg);
 void node_a_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg);
 void set_vmax_amax_callback(const my_delta_robot::msg::VmaxAmax::SharedPtr msg);
 void set_current_point_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg);
 
+/// @brief 
+/// @param argc 
+/// @param argv 
+/// @return 
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("node_b");
 
-    auto receive_node_a = node->create_subscription<my_delta_robot::msg::Posicionxyz>(
-        "send_to_node_b", 10, node_a_callback);
-    auto set_vmax_amax = node->create_subscription<my_delta_robot::msg::VmaxAmax>(
-        "set_vmax_amax", 10, set_vmax_amax_callback);
-    auto set_current_point = node->create_subscription<my_delta_robot::msg::Posicionxyz>(
-        "set_current_point", 10, set_current_point_callback);
-    auto sub_status_delta = node->create_subscription<std_msgs::msg::String>(
-        "status_delta", 10, Status_Delta_Callback);
+    auto receive_node_a = node->create_subscription<my_delta_robot::msg::Posicionxyz>("send_to_node_b", 10, node_a_callback);
+    auto set_vmax_amax = node->create_subscription<my_delta_robot::msg::VmaxAmax>("set_vmax_amax", 10, set_vmax_amax_callback);
+    auto set_current_point = node->create_subscription<my_delta_robot::msg::Posicionxyz>("set_current_point", 10, set_current_point_callback);
+    auto sub_status_delta = node->create_subscription<std_msgs::msg::String>("status_delta", 10, Status_Delta_Callback);
 
     auto chatter_pub = node->create_publisher<my_delta_robot::msg::LinearSpeedXYZ>("input_ls_final", 10);
     auto status_to_node_a = node->create_publisher<std_msgs::msg::String>("status_to_node_a", 10);
@@ -86,49 +91,53 @@ int main(int argc, char **argv) {
     vmax = 15000.0;
     amax = 130000.0;
 
-    status = false;
-    is_send_status_to_node_a = false;
-
     while (rclcpp::ok()) {
-        if (status) {
-            linear_speed_xyz.xo = my_point[0]->position_x;
-            linear_speed_xyz.yo = my_point[0]->position_y;
-            linear_speed_xyz.zo = my_point[0]->position_z;
+        std::unique_lock<std::mutex> uLock(mProcessingMutex);
+        mConditionProcess.wait(uLock, [&] { return mSignalScheduleSwitch.load(); });
 
-            linear_speed_xyz.xf = my_point[1]->position_x;
-            linear_speed_xyz.yf = my_point[1]->position_y;
-            linear_speed_xyz.zf = my_point[1]->position_z;
+        linear_speed_xyz.xo = my_point[0]->position_x;
+        linear_speed_xyz.yo = my_point[0]->position_y;
+        linear_speed_xyz.zo = my_point[0]->position_z;
 
-            linear_speed_xyz.vmax = vmax;
-            linear_speed_xyz.amax = amax;
+        linear_speed_xyz.xf = my_point[1]->position_x;
+        linear_speed_xyz.yf = my_point[1]->position_y;
+        linear_speed_xyz.zf = my_point[1]->position_z;
 
-            linear_speed_xyz.gripper = my_point[0]->gripper;
+        linear_speed_xyz.vmax = vmax;
+        linear_speed_xyz.amax = amax;
 
-            loop_rate.sleep();
-            chatter_pub->publish(linear_speed_xyz);
+        linear_speed_xyz.gripper = my_point[0]->gripper;
 
-            cout << "move from: " << my_point[0]->position_x << " " << my_point[0]->position_y << " " << my_point[0]->position_z
-                 << " to: " << my_point[1]->position_x << " " << my_point[1]->position_y << " " << my_point[1]->position_z << endl;
+        loop_rate.sleep();
+        chatter_pub->publish(linear_speed_xyz);
 
-            delete my_point[0];
-            my_point.erase(my_point.begin());
+        cout << "move from: " 
+            << my_point[0]->position_x << " " 
+            << my_point[0]->position_y << " " 
+            << my_point[0]->position_z
+            << " to: " 
+            << my_point[1]->position_x << " "
+            << my_point[1]->position_y << " " 
+            << my_point[1]->position_z << endl;
 
-            status = false;
-        }
+        delete my_point[0];
+        my_point.erase(my_point.begin());
 
-        if (is_send_status_to_node_a) {
-            msg.data = "Point [" + to_string(xx) + " " + to_string(yy) + " " + to_string(zz) + "] is finished";
-            status_to_node_a->publish(msg);
+        msg.data = "Point [" + to_string(xx) + " " + to_string(yy) + " " + to_string(zz) + "] is finished";
+        status_to_node_a->publish(msg);
 
-            is_send_status_to_node_a = false;
-        }
-
+        mSignalScheduleSwitch = false;
         rclcpp::spin_some(node);
     }
 
     return 0;
 }
 
+/// @brief common function for add point
+/// @param x 
+/// @param y 
+/// @param z 
+/// @param gripper 
 void add_point(double x, double y, double z, int gripper) {
     point_t *data = new point_t;
 
@@ -140,26 +149,25 @@ void add_point(double x, double y, double z, int gripper) {
     my_point.push_back(data);
 }
 
+/// @brief node a is done process -> then process for the next point
+/// @param msg 
 void Status_Delta_Callback(const std_msgs::msg::String::SharedPtr msg) {
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "status from main_node: [%s]", msg->data.c_str());
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "status from main_node: [%s]\n", msg->data.c_str());
 
-    if (my_point.size() == 1) {
+    if (my_point.size() != 0) {
         x_current = my_point[0]->position_x;
         y_current = my_point[0]->position_y;
         z_current = my_point[0]->position_z;
-
         my_point.clear();
 
-        is_send_status_to_node_a = true;
-
-        cout << endl;
-    }
-
-    if (!my_point.empty()) {
-        status = true;
+        std::lock_guard<std::mutex> lg(mProcessingMutex);
+        mSignalScheduleSwitch = true;
+        mConditionProcess.notify_one();
     }
 }
 
+/// @brief receive point to grip from node a thought "send_to_node_b", -> create the action for process by add 3 sub moveverment
+/// @param msg 
 void node_a_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
     xx = msg->x0;
     yy = msg->y0;
@@ -197,15 +205,21 @@ void node_a_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
         break;
     }
 
-    status = true;
+    std::lock_guard<std::mutex> lg(mProcessingMutex);
+    mSignalScheduleSwitch = true;
+    mConditionProcess.notify_one();
 }
 
+/// @brief 
+/// @param msg 
 void set_vmax_amax_callback(const my_delta_robot::msg::VmaxAmax::SharedPtr msg) {
     vmax = msg->vmax;
     amax = msg->amax;
     cout << "set vmax = " << vmax << ", and set amax = " << amax << endl;
 }
 
+/// @brief 
+/// @param msg 
 void set_current_point_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
     int temp = msg->type;
 
@@ -217,9 +231,7 @@ void set_current_point_callback(const my_delta_robot::msg::Posicionxyz::SharedPt
 
         if (z_current > -375 || z_current < -480) {
             z_current = -375.0;
-            cout << "[ERROR] Invalid point, current point now set to x: " << x_current << " y: " << y_current << " z: " << z_current << endl;
-        } else {
-            cout << "current point set to point x: " << x_current << " y: " << y_current << " z: " << z_current << endl;
+            cout << "[ERROR] Invalid point, current point now set to x: " << x_current << " y: " << y_current << " z: " << z_current << " y: " << y_current << " z: " << z_current << endl;
         }
         break;
 

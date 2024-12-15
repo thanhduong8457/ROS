@@ -73,8 +73,7 @@ int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("serial_module");
 
-    auto sub = node->create_subscription<sensor_msgs::msg::JointState>(
-        "/joint_states", 10, MoveGroupCallback);
+    auto sub = node->create_subscription<sensor_msgs::msg::JointState>("/joint_states", 10, MoveGroupCallback);
     auto chatter_pub = node->create_publisher<my_delta_robot::msg::PositionArm>("thanhduong", 10);
 
     try {

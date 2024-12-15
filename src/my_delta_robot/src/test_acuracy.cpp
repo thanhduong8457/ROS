@@ -24,8 +24,12 @@ enum {
 
 vector<point_t *> my_point;
 bool status;
-bool is_exit;
 
+/// @brief 
+/// @param x 
+/// @param y 
+/// @param z 
+/// @param type 
 void add_point(double x, double y, double z, int type) {
     point_t *data = new point_t;
     data->position_x = x;
@@ -36,24 +40,25 @@ void add_point(double x, double y, double z, int type) {
     my_point.push_back(data);
 }
 
+/// @brief 
+/// @param msg 
 void Status_Delta_Callback(const std_msgs::msg::String::SharedPtr msg) {
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "status: [%s]", msg->data.c_str());
 
     if (!my_point.empty()) {
         status = true;
     }
-
-    if (my_point.empty()) {
-        is_exit = true;
-    }
 }
 
+/// @brief 
+/// @param argc 
+/// @param argv 
+/// @return 
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("node_a");
 
-    auto sub_status_delta = node->create_subscription<std_msgs::msg::String>(
-        "status_to_node_a", 10, Status_Delta_Callback);
+    auto sub_status_delta = node->create_subscription<std_msgs::msg::String>("status_to_node_a", 10, Status_Delta_Callback);
     auto chatter_pub = node->create_publisher<my_delta_robot::msg::Posicionxyz>("send_to_node_b", 10);
 
     rclcpp::Rate loop_rate(1);
@@ -64,7 +69,6 @@ int main(int argc, char **argv) {
 
     my_delta_robot::msg::Posicionxyz posicionxyz;
     status = true;
-    is_exit = false;
 
     while (rclcpp::ok()) {
         if (status) {
@@ -80,10 +84,6 @@ int main(int argc, char **argv) {
             my_point.erase(my_point.begin());
 
             status = false;
-        }
-
-        if (is_exit) {
-            return 0;
         }
 
         rclcpp::spin_some(node);

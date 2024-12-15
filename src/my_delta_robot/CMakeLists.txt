@@ -60,4 +60,13 @@ add_executable(test_acuracy src/test_acuracy.cpp)
 ament_target_dependencies(test_acuracy rclcpp std_msgs sensor_msgs urdf geometry_msgs)
 rosidl_target_interfaces(test_acuracy ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
+install(TARGETS 
+  main_node
+  node_a
+  node_b
+  draw
+  test_acuracy
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

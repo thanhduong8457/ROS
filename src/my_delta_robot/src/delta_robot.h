@@ -4,41 +4,69 @@
 #include "delta_define.h"
 #include "common.h"
 
-typedef struct Point {
+class Point {
+public:
     double x;
     double y;
     double z;
-    void init(void) {
+
+    Point() {
+        init();
+    }
+
+    bool operator!=(const Point& other) const {
+        return this->x != other.x || this->y != other.y || this->z != other.z;
+    }
+
+    void operator=(const Point& other) {
+        this->x = other.x;
+        this->y = other.y;
+        this->z = other.z;
+    }
+
+    void init() {
         x = 0;
         y = 0;
         z = 0;
     }
-}Point_t;
+};
 
-typedef struct Theta {
+class Theta {
+public:
     double angle1;
     double angle2;
     double angle3;
+
+    Theta() {
+        init();
+    }
+
+    void operator=(const Theta& other) {
+        this->angle1 = other.angle1;
+        this->angle2 = other.angle2;
+        this->angle3 = other.angle3;
+    }
+
     void init(void) {
         angle1 = 0;
         angle2 = 0;
         angle3 = 0;
     }
-}Theta_t;
+};
 
 typedef struct data_delta {
     double pos;     //
     Point position_val;
 
     double vel;     //
-    //double vel_x;
-    //double vel_y;
-    //double vel_z;
+    double vel_x;
+    double vel_y;
+    double vel_z;
 
     double acel;    //
-    //double acel_x;
-    //double acel_y;
-    //double acel_z;
+    double acel_x;
+    double acel_y;
+    double acel_z;
 
     Theta theta_val;
 
@@ -47,17 +75,26 @@ typedef struct data_delta {
 
 class delta_robot{
 private:
-    double delta_calcAngleYZ(Point point0);
+    double CalculateAngleYZ(Point);
     Point unit_vector(Point point0, Point pointf);
-    void angle_rotation(double nx, double ny, double nz, double& theta_y, double& theta_z);
-    Theta inverse(Point point0);
+    void angle_rotation(Point unit_vector);
     double angle_yz(Point point0);
-    void system_linear_invese(double xprima, double rot_z[3][3], 
-    double rot_y[3][3], double theta_y, double theta_z, double m_trans[4][4], double(&xyz_res)[4][1]);
+    void system_linear_invese(double xprima, double(&xyz_res)[4][1]);
 
 public:
     double vmax;
     double amax;
+
+    unsigned int num_point_1;
+    unsigned int num_point_2;
+
+    double rot_z[3][3];
+    double rot_y[3][3];
+    double rot_tras[4][4];
+    double dis, theta_y, theta_z;
+
+    Point mStartPoint;
+    Point mEndPoint;
     
     data_delta_t *data = NULL;
     std::vector<data_delta_t*> m_data_delta;
@@ -66,26 +103,14 @@ public:
     ~delta_robot(void);
 
     //void path_linear_speed(double xo, double yo, double zo, double xf, double yf, double zf);
-    //void system_linear(double xo, double yo, double zo, double xf, double yf, double zf);
+    Theta inverse(Point point0);
 
-    void trapezoidal_velocity_profile(double q0, double q1, int pas_1, int pas_2);
+    void TrapezoidalVelocityProfile(void);
     void ls_v_a_puntual(double q0, double q1, double tactual, double &q_actual, double &v_actual, double &a_actual);
 
-    void system_linear(
-        Point point0, 
-        Point pointf, 
-        double& dis, double(&rot_z)[3][3], 
-        double(&rot_y)[3][3], 
-        double& theta_y, 
-        double& theta_z, 
-        double(&rot_tras)[4][4]
-    );
-
-    void system_linear_matrix(double time_point, double rot_z[3][3], double rot_y[3][3], double theta_y, double theta_z, double m_trans[4][4]);
-    Theta delta_calcInverse(Point point0);
-    Point delta_calcForward(Theta theta);
-    void angulos_eulerianos(double ti, Point point, Theta theta, int gripper, double(&position)[13]);
-
-    void inverse_m(void);
+    void system_linear(void);
+    void system_linear_matrix(void);
+    void CreateJointStateList(Point point, Theta theta, int gripper, double(&position)[13]);
+    void InverseAllJointStateExist(void);
 };
 #endif

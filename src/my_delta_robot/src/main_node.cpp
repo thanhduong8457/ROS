@@ -9,117 +9,116 @@
 #include "delta_define.h"
 #include "delta_robot.h"
 
-Point point0;
-Point pointf;
+class MyNode: public rclcpp::Node {
+public:
+    int gripper;
+    delta_robot *m_delta_robot;
 
-double call_vmax_2, call_amax_2;
-int num_point_1, num_point_2;
+    double position_value[13];
 
-int gripper;
-bool status;
-
-void callback_linear_speed_xyz(const my_delta_robot::msg::LinearSpeedXYZ::SharedPtr msg);
-void set_num_point_callback(const my_delta_robot::msg::NumPoint::SharedPtr msg);
-
-/// @brief 
-/// @param argc 
-/// @param argv 
-/// @return 
-int main(int argc, char **argv) {
-    rclcpp::init(argc, argv);
-    auto node = rclcpp::Node::make_shared("main_node");
-
-    // ##################  Subscriber  ##################
-    auto receive_node_a = node->create_subscription<my_delta_robot::msg::LinearSpeedXYZ>(
-        "input_ls_final", 10, callback_linear_speed_xyz);
-    auto set_num_point = node->create_subscription<my_delta_robot::msg::NumPoint>(
-        "set_num_point", 10, set_num_point_callback);
-
-    // ##################  Publisher  ##################
-    auto pub_for_rviz = node->create_publisher<sensor_msgs::msg::JointState>("joint_states", 1);
-    auto status_to_node_b = node->create_publisher<std_msgs::msg::String>("status_delta", 1);
-    auto v_a_out = node->create_publisher<my_delta_robot::msg::VmaxAmax>("v_a_out", 1);
-
-    rclcpp::Rate loop_rate(7.8125);
-
-    num_point_1 = 120;
-    num_point_2 = 120;
-
-    double dis, theta_y, theta_z;
-
-    double rot_z[3][3] = {0};
-    double rot_y[3][3] = {0};
-    double rot_tras[4][4] = {0};
-    double position_value[13] = {0};
-
-    std_msgs::msg::String msg;
+    rclcpp::Rate loop_rate;
     sensor_msgs::msg::JointState JointState;
     my_delta_robot::msg::VmaxAmax vm_am;
+    std_msgs::msg::String msg;
 
-    JointState.header.frame_id = "";
+    std::shared_ptr<rclcpp::Subscription<my_delta_robot::msg::LinearSpeedXYZ>> receive_node_a;
+    std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::JointState>> pub_for_rviz;
+    std::shared_ptr<rclcpp::Publisher<std_msgs::msg::String>> status_to_node_b;
+    std::shared_ptr<rclcpp::Publisher<my_delta_robot::msg::VmaxAmax>> v_a_out;
 
-    JointState.name.resize(13);
-    JointState.position.resize(13);
+    MyNode():Node("main_node"), loop_rate(7.8125) {
+        RCLCPP_INFO(this->get_logger(), "main_node is created");
 
-    JointState.name[0] = "base_brazo1";
-    JointState.name[1] = "base_brazo2";
-    JointState.name[2] = "base_brazo3";
-    JointState.name[3] = "codo1_a";
-    JointState.name[4] = "codo1_b";
-    JointState.name[5] = "codo2_a";
-    JointState.name[6] = "codo2_b";
-    JointState.name[7] = "codo3_a";
-    JointState.name[8] = "codo3_b";
-    JointState.name[9] = "act_x";
-    JointState.name[10] = "act_y";
-    JointState.name[11] = "act_z";
-    JointState.name[12] = "gripper";
+        receive_node_a = this->create_subscription<my_delta_robot::msg::LinearSpeedXYZ>("input_ls_final", 10, std::bind(&MyNode::callback_linear_speed_xyz, this, std::placeholders::_1));
+        auto set_num_point = this->create_subscription<my_delta_robot::msg::NumPoint>("set_num_point", 10, std::bind(&MyNode::set_num_point_callback, this, std::placeholders::_1));
 
-    status = false;
-    delta_robot *m_delta_robot = new delta_robot; // construct a new delta_robot
-    m_delta_robot->vmax = call_vmax_2;
-    m_delta_robot->amax = call_amax_2;
+        pub_for_rviz = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
+        status_to_node_b = this->create_publisher<std_msgs::msg::String>("status_delta", 10);
+        v_a_out = this->create_publisher<my_delta_robot::msg::VmaxAmax>("v_a_out", 10);
 
-    while (rclcpp::ok()) {
-        if (status) {
-            RCLCPP_INFO(node->get_logger(), "v_max = %lf, a_max = %lf", m_delta_robot->vmax, m_delta_robot->amax);
+        JointState.header.frame_id = "";
+        JointState.name.resize(13);
+        JointState.position.resize(13);
+        JointState.name[0] = "base_brazo1";
+        JointState.name[1] = "base_brazo2";
+        JointState.name[2] = "base_brazo3";
+        JointState.name[3] = "codo1_a";
+        JointState.name[4] = "codo1_b";
+        JointState.name[5] = "codo2_a";
+        JointState.name[6] = "codo2_b";
+        JointState.name[7] = "codo3_a";
+        JointState.name[8] = "codo3_b";
+        JointState.name[9] = "act_x";
+        JointState.name[10] = "act_y";
+        JointState.name[11] = "act_z";
+        JointState.name[12] = "gripper";
 
-            m_delta_robot->system_linear(point0, pointf, dis, rot_z, rot_y, theta_y, theta_z, rot_tras);
-            m_delta_robot->trapezoidal_velocity_profile(0, dis, num_point_1, num_point_2); // Trapezoidal velocity profile
+        m_delta_robot = new delta_robot(); // construct a new delta_robot
+        m_delta_robot->vmax = 1500;
+        m_delta_robot->amax = 200000;
+        m_delta_robot->num_point_1 = 120;
+        m_delta_robot->num_point_2 = 120;
+        // Create a thread to call main_func
+        // std::thread(&MyNode::main_func, this).detach();
+    }
 
-            // Reverse rotation end point, start point and trajectory #######
-            m_delta_robot->system_linear_matrix(m_delta_robot->m_data_delta.size(), rot_z, rot_y, theta_y, theta_z, rot_tras);
+    ~MyNode() {
+        delete m_delta_robot;
+    }
+private:
+    void callback_linear_speed_xyz(const my_delta_robot::msg::LinearSpeedXYZ::SharedPtr msg) {
+        m_delta_robot->mStartPoint.x = msg->xo;
+        m_delta_robot->mStartPoint.y = msg->yo;
+        m_delta_robot->mStartPoint.z = msg->zo;
 
-            // Inverse kinematics
-            m_delta_robot->inverse_m();
+        m_delta_robot->mEndPoint.x = msg->xf;
+        m_delta_robot->mEndPoint.y = msg->yf;
+        m_delta_robot->mEndPoint.z = msg->zf;
 
-            RCLCPP_INFO(node->get_logger(), "Creating Linear Path RVIZ!");
+        gripper = msg->gripper;
 
-            m_delta_robot->angulos_eulerianos(1,
-                                              m_delta_robot->m_data_delta[0]->position_val,
-                                              m_delta_robot->m_data_delta[0]->theta_val,
-                                              gripper,
-                                              position_value);
+        if (m_delta_robot->mStartPoint != m_delta_robot->mEndPoint) {
+            main_func();
+        }
+        else {
+            std::cout << "Start point and end Point is duplicate" << std::endl;
+        }
+    }
 
-            double delta = 0.5;
+    /// @brief 
+    /// @param msg 
+    void set_num_point_callback(const my_delta_robot::msg::NumPoint::SharedPtr msg) {
+        if (msg->num_point_1 > 0 && msg->num_point_2 > 0) {
+            m_delta_robot->num_point_1 = msg->num_point_1;
+            m_delta_robot->num_point_2 = msg->num_point_2;
+            std::cout << "set num_point_1 = " << m_delta_robot->num_point_1 << " and num_point_2 = " << m_delta_robot->num_point_2 << std::endl;
+        }
+        else {
+            std::cout << "ERROR to set num_point" << std::endl;
+        }
+    }
+    
+    /// @brief 
+    void main_func() {
+        double delta = 0;
+        if (rclcpp::ok()) {
+            RCLCPP_INFO(this->get_logger(), "v_max = %lf, a_max = %lf", m_delta_robot->vmax, m_delta_robot->amax);
 
-            // publish data of joints state to topic /joint_states
-            for (int i = 0; i < 13; i++)
-                JointState.position[i] = position_value[i];
-            JointState.header.stamp = node->now();
-            pub_for_rviz->publish(JointState);
+            m_delta_robot->system_linear();
+            m_delta_robot->TrapezoidalVelocityProfile(); // Trapezoidal velocity profile
+            m_delta_robot->system_linear_matrix();
+            // m_delta_robot->InverseAllJointStateExist(); // Inverse kinematics
+
+            RCLCPP_INFO(this->get_logger(), "Creating Linear Path RVIZ!");
 
             // publish data of velocity and acceleration to visualize on rpt_plot
-            vm_am.vmax = m_delta_robot->m_data_delta[0]->vel;
-            vm_am.amax = m_delta_robot->m_data_delta[0]->acel;
-            v_a_out->publish(vm_am);
+            // vm_am.vmax = m_delta_robot->m_data_delta[0]->vel;
+            // vm_am.amax = m_delta_robot->m_data_delta[0]->acel;
+            // v_a_out->publish(vm_am);
 
-            rclcpp::Rate rate(1.0 / delta);
-            rate.sleep();
-
-            for (size_t i = 1; i < m_delta_robot->m_data_delta.size(); i++) {
-                m_delta_robot->angulos_eulerianos(
-                    m_delta_robot->m_data_delta[i]->time_point * 10,
+            for (unsigned int i = 0; i < m_delta_robot->m_data_delta.size(); i++) {
+                m_delta_robot->m_data_delta[i]->theta_val = m_delta_robot->inverse(m_delta_robot->m_data_delta[i]->position_val);
+                m_delta_robot->CreateJointStateList(
                     m_delta_robot->m_data_delta[i]->position_val,
                     m_delta_robot->m_data_delta[i]->theta_val,
                     gripper,
@@ -128,9 +127,11 @@ int main(int argc, char **argv) {
                 delta = m_delta_robot->m_data_delta[i]->time_point * 10 - m_delta_robot->m_data_delta[i - 1]->time_point * 10;
 
                 // publish data of joints state to topic /joint_states
-                for (int j = 0; j < 13; j++)
+                for (int j = 0; j < 13; j++) {
                     JointState.position[j] = position_value[j];
-                JointState.header.stamp = node->now();
+                }
+                    
+                JointState.header.stamp = this->now();
                 pub_for_rviz->publish(JointState);
 
                 // publish data of velocity and acceleration to visualize on rpt_plot
@@ -143,55 +144,21 @@ int main(int argc, char **argv) {
             }
 
             // dump status
-            msg.data = "from " + std::to_string(point0.x) + " " + std::to_string(point0.y) + " " + std::to_string(point0.z) + " to " + std::to_string(pointf.x) + " " + std::to_string(pointf.y) + " " + std::to_string(pointf.z) + " is finished";
+            msg.data = "from " + std::to_string(m_delta_robot->mStartPoint.x) + " " + std::to_string(m_delta_robot->mStartPoint.y) + " " + std::to_string(m_delta_robot->mStartPoint.z) + " to " + std::to_string(m_delta_robot->mEndPoint.x) + " " + std::to_string(m_delta_robot->mEndPoint.y) + " " + std::to_string(m_delta_robot->mEndPoint.z) + " is finished";
             status_to_node_b->publish(msg);
-
-            status = false;
         }
-
-        loop_rate.sleep();
-        rclcpp::spin_some(node);
     }
+};
 
-    delete m_delta_robot;
+/// @brief 
+/// @param argc 
+/// @param argv 
+/// @return 
+int main(int argc, char **argv) {
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<MyNode>();
+
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
-}
-
-/// @brief 
-/// @param msg 
-void callback_linear_speed_xyz(const my_delta_robot::msg::LinearSpeedXYZ::SharedPtr msg) {
-    point0.x = msg->xo;
-    point0.y = msg->yo;
-    point0.z = msg->zo;
-
-    pointf.x = msg->xf;
-    pointf.y = msg->yf;
-    pointf.z = msg->zf;
-
-    call_vmax_2 = msg->vmax;
-    call_amax_2 = msg->amax;
-
-    gripper = msg->gripper;
-
-    if ((point0.x == pointf.x) && (point0.y == pointf.y) && (point0.z == pointf.z)) {
-        std::cout << "Start point and end Point is duplicate" << std::endl;
-        status = false;
-    }
-    else {
-        status = true;
-    }
-}
-
-/// @brief 
-/// @param msg 
-void set_num_point_callback(const my_delta_robot::msg::NumPoint::SharedPtr msg) {
-    if (msg->num_point_1 > 0 && msg->num_point_2 > 0) {
-        num_point_1 = msg->num_point_1;
-        num_point_2 = msg->num_point_2;
-        std::cout << "set num_point_1 = " << num_point_1 << " and num_point_2 = " << num_point_2 << std::endl;
-    }
-    else {
-        std::cout << "ERROR to set num_point" << std::endl;
-    }
 }
