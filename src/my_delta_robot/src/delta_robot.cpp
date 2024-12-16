@@ -1,16 +1,25 @@
 #include "delta_robot.h"
 
-/// @brief 
-/// @param  
 delta_robot::delta_robot(void) {
-    data = new data_delta_t;
+    // data = new data_delta_t;
+    initialize();
 }
 
-/// @brief 
-/// @param  
 delta_robot::~delta_robot(void) {
-    while (0 != m_data_delta.size()) {
-        delete m_data_delta[0];
+    while (!m_data_delta.empty()) {
+        delete m_data_delta.back();
+        m_data_delta.pop_back();
+    }
+}
+
+void delta_robot::initialize(void) {
+    this->vmax = 1500;
+    this->amax = 200000;
+    this->num_point_1 = 120;
+    this->num_point_2 = 120;
+    while (!m_data_delta.empty()) {
+        delete m_data_delta.back();
+        m_data_delta.pop_back();
     }
 }
 
@@ -19,17 +28,17 @@ delta_robot::~delta_robot(void) {
 /// @param pointf 
 /// @return 
 Point delta_robot::unit_vector(Point point0, Point pointf) {
-    Point retrun_point;
+    Point return_point;
     double delta_x = pointf.x - point0.x;
     double delta_y = pointf.y - point0.y;
     double delta_z = pointf.z - point0.z;
 
     double modulo = sqrt(delta_x * delta_x + delta_y * delta_y + delta_z * delta_z);
 
-    retrun_point.x = delta_x / modulo;
-    retrun_point.y = delta_y / modulo;
-    retrun_point.z = delta_z / modulo;
-    return retrun_point;
+    return_point.x = delta_x / modulo;
+    return_point.y = delta_y / modulo;
+    return_point.z = delta_z / modulo;
+    return return_point;
 }
 
 // void delta_robot::path_linear_speed(double xo,double yo,double zo,double xf,double yf,double zf)
@@ -56,6 +65,8 @@ Point delta_robot::unit_vector(Point point0, Point pointf) {
 /// @param theta_z 
 /// @param rot_tras 
 void delta_robot::system_linear(void) {
+    initialize();
+
     double xoo = mStartPoint.x * mmtm;
     double yoo = mStartPoint.y * mmtm;
     double zoo = mStartPoint.z * mmtm;
@@ -64,9 +75,9 @@ void delta_robot::system_linear(void) {
     double yff = mEndPoint.y * mmtm;
     double zff = mEndPoint.z * mmtm;
 
-    double pf[3][1] = {0, 0, 0};
-    double pf_trans[4][1] = {0, 0, 0, 0};
-    double x_trans[4][1] = {0, 0, 0, 0};
+    double pf[3] = {0, 0, 0};
+    double pf_trans[4] = {0, 0, 0, 0};
+    double x_trans[4] = {0, 0, 0, 0};
 
     // Traslacion(Xo, Yo, Zo)
     rot_tras[0][0] = 1;
@@ -76,16 +87,20 @@ void delta_robot::system_linear(void) {
     rot_tras[0][3] = -xoo;
     rot_tras[1][3] = -yoo;
     rot_tras[2][3] = -zoo;
+    //[1  0  0 -xoo]
+    //[0  1  0 -yoo]
+    //[0  0  1 -zoo]
+    //[0  0  0   1 ]
 
     // Traslacion(Xf, Yf, Zf)
-    pf_trans[0][0] = xff;
-    pf_trans[1][0] = yff;
-    pf_trans[2][0] = zff;
-    pf_trans[3][0] = 1;
+    pf_trans[0] = xff;
+    pf_trans[1] = yff;
+    pf_trans[2] = zff;
+    pf_trans[3] = 1;
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
-            x_trans[i][0] += rot_tras[i][j] * pf_trans[j][0];
+            x_trans[i] += rot_tras[i][j] * pf_trans[j];
         }
     }
 
@@ -94,39 +109,37 @@ void delta_robot::system_linear(void) {
     Point temp_point1;
     temp_point.init();
     temp_point1.init();
-    temp_point1.x = x_trans[0][0];
-    temp_point1.y = x_trans[1][0];
-    temp_point1.z = x_trans[2][0];
+    temp_point1.x = x_trans[0];
+    temp_point1.y = x_trans[1];
+    temp_point1.z = x_trans[2];
     my_unit_vector = unit_vector(temp_point, temp_point1);
     angle_rotation(my_unit_vector);
 
-    double cos_axisz = cos(theta_y);
-    double sin_axisz = sin(theta_y);
+    double cos_axisz = cos(this->theta_y);
+    double sin_axisz = sin(this->theta_y);
 
-    double cos_axisy = cos(theta_z);
-    double sin_axisy = sin(theta_z);
+    double cos_axisy = cos(this->theta_z);
+    double sin_axisy = sin(this->theta_z);
 
-    // plano xy ya trasladado
-    pf[0][0] = x_trans[0][0];
-    pf[1][0] = x_trans[1][0];
-    pf[2][0] = x_trans[2][0];
-    // rotacion respecto a eje z
+    pf[0] = x_trans[0];
+    pf[1] = x_trans[1];
+    pf[2] = x_trans[2];
+
     rot_z[0][0] = cos_axisz;
     rot_z[0][1] = sin_axisz;
     rot_z[1][0] = -1 * sin_axisz;
     rot_z[1][1] = cos_axisz;
     rot_z[2][2] = 1;
 
-    double m_rot1[3][1] = {};
-    double m_rot2[3][1] = {};
+    double m_rot1[3] = {};
+    double m_rot2[3] = {};
 
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            m_rot1[i][0] += rot_z[i][j] * pf[j][0];
+            m_rot1[i] += rot_z[i][j] * pf[j];
         }
     }
 
-    // rotacion respecto a eje y
     rot_y[0][0] = cos_axisy;
     rot_y[0][2] = sin_axisy;
     rot_y[1][1] = 1;
@@ -135,14 +148,13 @@ void delta_robot::system_linear(void) {
 
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            m_rot2[i][0] += rot_y[i][j] * m_rot1[j][0];
+            m_rot2[i] += rot_y[i][j] * m_rot1[j];
         }
     }
 
-    dis = m_rot2[0][0];
-    // dis = m_rot2[0][0] * mtmm;
-    // theta_z = theta_z * rtd;
-    // theta_y = theta_y * rtd;
+    dis = m_rot2[0] * mtmm;
+    theta_z = theta_z * rtd;
+    theta_y = theta_y * rtd;
 }
 
 /// @brief 
@@ -152,30 +164,47 @@ void delta_robot::system_linear(void) {
 /// @param theta_z 
 /// @param theta_y 
 void delta_robot::angle_rotation(Point unit_vector) {
-    if (unit_vector.z < 0)
+    if (unit_vector.z < 0) {
         theta_z = (360 * dtr) + asin(unit_vector.z);
-    else
+    } else {
         theta_z = asin(unit_vector.z);
+    }
 
     if (unit_vector.x < 0) {
-        theta_y = (180 * dtr) + (atan(unit_vector.y / unit_vector.x));
-    }
-    else if (unit_vector.x == 0) {
-        if (unit_vector.y < 0)
-            theta_y = (270 * dtr);
-        else if (unit_vector.y == 0)
-            theta_y = 0;
-        else
-            theta_y = (90 * dtr);
-    }
-    else {
+        theta_y = (180 * dtr) + atan(unit_vector.y / unit_vector.x);
+    } else if (unit_vector.x == 0) {
         if (unit_vector.y < 0) {
-            theta_y = (360 * dtr) + (atan(unit_vector.y / unit_vector.x));
+            theta_y = 270 * dtr;
+        } else if (unit_vector.y == 0) {
+            theta_y = 0;
+        } else {
+            theta_y = 90 * dtr;
         }
-        else {
-            theta_y = (atan(unit_vector.y / unit_vector.x));
+    } else {
+        if (unit_vector.y < 0) {
+            theta_y = (360 * dtr) + atan(unit_vector.y / unit_vector.x);
+        } else {
+            theta_y = atan(unit_vector.y / unit_vector.x);
         }
     }
+}
+
+double delta_robot::delta_calcAngleYZ(double x0, double y0, double z0) {
+    double y1 = -0.5 * 0.57735 * ff; // f/2 * tg 30
+    y0 -= 0.5 * 0.57735 * ee;        // shift center to edge
+                                     // z = a + b*y
+    double a = (x0 * x0 + y0 * y0 + z0 * z0 + rf * rf - re * re - y1 * y1) / (2 * z0);
+    double b = (y1 - y0) / z0;
+
+    // discriminant
+    double d = -(a + b * y1) * (a + b * y1) + rf * (b * b * rf + rf);
+    if (d < 0) {
+        return -1; // non-existing point
+    }
+    double yj = (y1 - a * b - sqrt(d)) / (b * b + 1); // choosing outer point
+    double zj = a + b * yj;
+    double theta = 180.0 * atan(-zj / (y1 - yj)) / pi + ((yj > y1) ? 180.0 : 0.0);
+    return theta;
 }
 
 /// @brief 
@@ -184,7 +213,7 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
     try {
         double q0 = 0; // start from zero
         q0 *= mmtm;
-        this->dis *= mmtm;
+        dis *= mmtm;
         vmax *= mmtm;
         amax *= mmtm;
 
@@ -194,21 +223,21 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
         double tau = vmax / amax;
 
         double T = 0;
-        if ((this->dis - q0) > 0)
+        if ((this->dis - q0) > 0) {
             T = (this->dis - q0) / vmax + tau;
-        else if ((this->dis - q0) < 0)
+        }
+        else if ((this->dis - q0) < 0) {
             T = (q0 - this->dis) / vmax + tau;
+        }
 
         double paso1 = tau / num_point_1;
         double paso2 = (T - (2 * tau)) / num_point_2;
-
         int pas_total = num_point_1 + num_point_2 + num_point_1;
 
         double Tf = 2 * (sqrt((this->dis - q0) / (amax)));
         double vmax_acel = amax * (Tf / 2);
 
         if (vmax_acel <= vmax) {
-            cout << "case vmax_acel <= vmax we have" << endl;
             vmax = vmax_acel;
             tau = Tf / 2;
             T = Tf;
@@ -219,6 +248,7 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
         }
 
         for (int i = 0; i < pas_total; i++) {
+            data = new data_delta_t;
             data->pos = 0;
             data->position_val.init();
             data->theta_val.init();
@@ -245,17 +275,17 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
                 ti = T;
             }
 
-            ls_v_a_puntual(q0, this->dis, ti, q_actual, v_actual, a_actual);
+            ls_v_a_puntual(q0, dis, ti, q_actual, v_actual, a_actual);
             m_data_delta[i]->pos = q_actual;
             m_data_delta[i]->vel = v_actual;
             m_data_delta[i]->acel = a_actual;
             m_data_delta[i]->time_point = ti;
+            cout << "dis=" << q_actual << ", v=" << v_actual << ", a_actual=" << a_actual << ", time_point=" << ti << endl;
         }
     }
     catch(const std::exception& e) {
         std::cerr << e.what() << '\n';
     }
-    
 }
 
 /// @brief 
@@ -316,24 +346,22 @@ void delta_robot::ls_v_a_puntual(
 }
 
 /// @brief 
-/// @param time_point 
-/// @param rot_z 
-/// @param rot_y 
-/// @param theta_y 
-/// @param theta_z 
-/// @param m_trans 
 void delta_robot::system_linear_matrix(void) {
-    // theta_y = theta_y * dtr;
-    // theta_z = theta_z * dtr;
-    double xyz_res[4][1] = {0, 0, 0, 0};
-
+    theta_y = theta_y * dtr;
+    theta_z = theta_z * dtr;
+    double xyz_res[4] = {0, 0, 0, 0};
+    
     for (int i = 0; i < m_data_delta.size(); i++) {
+        for (int u = 0; u < 4; u++) {
+            xyz_res[u] = 0; // init the array
+        }
         system_linear_invese(m_data_delta[i]->pos, xyz_res);
 
-        m_data_delta[i]->position_val.x = xyz_res[0][0];
-        m_data_delta[i]->position_val.y = xyz_res[1][0];
-        m_data_delta[i]->position_val.z = xyz_res[2][0];
-
+        m_data_delta[i]->position_val.x = xyz_res[0];
+        m_data_delta[i]->position_val.y = xyz_res[1];
+        m_data_delta[i]->position_val.z = xyz_res[2];
+        cout << "x=" << xyz_res[0] << ", y=" << xyz_res[1] << ", z=" << xyz_res[2] << endl;
+        
         // // ######  velocidad xyz  ##########
         // system_linear_invese(m_data_delta[i]->vel, rot_z, rot_y, theta_y, theta_z, rot_tras, xyz_res);
         // m_data_delta[i]->vel_x = xyz_res[0][0];
@@ -356,15 +384,15 @@ void delta_robot::system_linear_matrix(void) {
 /// @param theta_z 
 /// @param m_trans 
 /// @param xyz_res 
-void delta_robot::system_linear_invese(double xprima, double (&xyz_res)[4][1]) {
+void delta_robot::system_linear_invese(double xprima, double (&xyz_res)[4]) {
     double rot_tras_invese[4][4] = {};
-    double pf_invese[3][1] = {};
-    double pf_trans_invese[4][1] = {};
+    double pf_invese[3] = {};
+    double pf_trans_invese[4] = {};
     double m_trans_invese[4][4] = {};
     // ######   Rotacion Y  ######
-    pf_invese[0][0] = xprima;
-    pf_invese[1][0] = 0;
-    pf_invese[2][0] = 0;
+    pf_invese[0] = xprima;
+    pf_invese[1] = 0;
+    pf_invese[2] = 0;
 
     double rot_y_tras[3][3] = {};
     for (int i = 0; i < 3; ++i) {
@@ -373,10 +401,10 @@ void delta_robot::system_linear_invese(double xprima, double (&xyz_res)[4][1]) {
         }
     }
 
-    double m_rot1_invese[3][1] = {};
+    double m_rot1_invese[3] = {};
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            m_rot1_invese[i][0] += rot_y_tras[i][j] * pf_invese[j][0];
+            m_rot1_invese[i] += rot_y_tras[i][j] * pf_invese[j];
         }
     }
     // ######   Rotacion Z  ######
@@ -387,18 +415,17 @@ void delta_robot::system_linear_invese(double xprima, double (&xyz_res)[4][1]) {
         }
     }
 
-    // m_rot2_invese = rot_z_tras.dot(m_rot1_invese)
-    double m_rot2_invese[3][1] = {};
+    double m_rot2_invese[3] = {};
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            m_rot2_invese[i][0] += rot_z_tras[i][j] * m_rot1_invese[j][0];
+            m_rot2_invese[i] += rot_z_tras[i][j] * m_rot1_invese[j];
         }
     }
 
-    pf_trans_invese[0][0] = m_rot2_invese[0][0];
-    pf_trans_invese[1][0] = m_rot2_invese[1][0];
-    pf_trans_invese[2][0] = m_rot2_invese[2][0];
-    pf_trans_invese[3][0] = 1;
+    pf_trans_invese[0] = m_rot2_invese[0];
+    pf_trans_invese[1] = m_rot2_invese[1];
+    pf_trans_invese[2] = m_rot2_invese[2];
+    pf_trans_invese[3] = 1;
 
     m_trans_invese[0][3] = -1 * rot_tras[0][3];
     m_trans_invese[1][3] = -1 * rot_tras[1][3];
@@ -410,7 +437,7 @@ void delta_robot::system_linear_invese(double xprima, double (&xyz_res)[4][1]) {
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
-            xyz_res[i][0] += m_trans_invese[i][j] * pf_trans_invese[j][0];
+            xyz_res[i] += m_trans_invese[i][j] * pf_trans_invese[j];
         }
     }
 }
@@ -464,6 +491,9 @@ Theta delta_robot::inverse(Point point) {
     point_temp.z = point.z;
     theta.angle1 = angle_yz(point_temp); // rotate to -120 deg
 
+    cout << "with x=" << point_temp.x << ", y=" << point_temp.y << ", z=" << point_temp.z ;
+    cout << " then thetal=" << theta.angle1 << ", theta2=" << theta.angle2 << ", theta3=" << theta.angle3 << endl;
+    
     return theta;
 }
 
@@ -566,14 +596,14 @@ void delta_robot::CreateJointStateList(
     angulos_codo(c1, p1, 1, a1_a, a1_b);
 
     // Data to publish in Rviz
-    position[0]  = theta.angle1;
-    position[1]  = theta.angle2;
-    position[2]  = theta.angle3;
+    position[0]  = theta.angle1 * dtr;
+    position[1]  = theta.angle2 * dtr;
+    position[2]  = theta.angle3 * dtr;
     position[3]  = theta.angle1 + a1_a;
     position[4]  = a1_b;
-    position[5]  = theta.angle2 + a2_a;
+    position[5]  = theta.angle2 * dtr + a2_a;
     position[6]  = a2_b;
-    position[7]  = theta.angle3 + a3_a;
+    position[7]  = theta.angle3 * dtr + a3_a;
     position[8]  = a3_b;
     position[9]  = pointi.x;
     position[10] = pointi.y;

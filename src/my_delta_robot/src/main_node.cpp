@@ -124,7 +124,7 @@ private:
                     gripper,
                     position_value);
 
-                delta = m_delta_robot->m_data_delta[i]->time_point * 10 - m_delta_robot->m_data_delta[i - 1]->time_point * 10;
+                delta = m_delta_robot->m_data_delta[i]->time_point * 10 - m_delta_robot->m_data_delta[i - 1]->time_point * 10; // bug index out range
 
                 // publish data of joints state to topic /joint_states
                 for (int j = 0; j < 13; j++) {
