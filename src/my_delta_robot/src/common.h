@@ -6,6 +6,13 @@ public:
     double y;
     double z;
 
+    Point(double x, double y, double z) {
+        init();
+        this->x = x;
+        this->y = y;
+        this->z = z;
+    }
+
     Point() {
         init();
     }

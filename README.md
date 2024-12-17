@@ -59,6 +59,8 @@ colcon build --symlink-install \
 # when we use the vitual env for build the package, the specify in percific python is required for building the package
 colcon build --symlink-install --cmake-args -DPython3_FIND_VIRTUALENV=ONLY --packages-select my_delta_robot
 
+colcon build --symlink-install --packages-select my_delta_robot
+
 beginner_tutorials
 my_delta_robot
 
@@ -195,3 +197,7 @@ rostopic pub -1 /set_num_point my_delta_robot/num_point -- 120 200
 # set vmax and a max for robot
 rostopic pub -1 /set_vmax_amax my_delta_robot/vmax_amax -- 1500.0 200000.0
 ros2 topic pub --once /set_vmax_amax my_delta_robot/msg/VmaxAmax "{vmax: 1500.0, amax: 200000.0}"
+ros2 topic pub --once /set_vmax_amax my_delta_robot/msg/VmaxAmax "{vmax: 10.0, amax: 200.0}"
+# another way to build project, 
+
+cmake ../src/my_delta_robot/ -DPython3_FIND_VIRTUALENV=ONLY

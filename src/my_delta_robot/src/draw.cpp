@@ -13,14 +13,9 @@
 #include "my_delta_robot/msg/posicionxyz.hpp"
 #include "my_delta_robot/msg/vmax_amax.hpp"
 
-using namespace std;
+#include "common.h"
 
-typedef struct point {
-    double position_x;
-    double position_y;
-    double position_z;
-    int gripper;
-} point_t;
+using namespace std;
 
 enum {
     circle = 0,
@@ -54,40 +49,40 @@ public:
         status_to_node_a = this->create_publisher<std_msgs::msg::String>("status_to_node_a", 10);
 
         // Setting default values
-        mCurrentPoint.position_x = 0.0;
-        mCurrentPoint.position_y = 0.0;
-        mCurrentPoint.position_z = -375.0;
+        mCurrentPoint.x = 0.0;
+        mCurrentPoint.y = 0.0;
+        mCurrentPoint.z = -375.0;
 
-        mCirclePoint.position_x = -100.0;
-        mCirclePoint.position_y = -100.0;
-        mCirclePoint.position_z = -453.0;
+        mCirclePoint.x = -100.0;
+        mCirclePoint.y = -100.0;
+        mCirclePoint.z = -453.0;
 
-        mSquarePoint.position_x = 0.0;
-        mSquarePoint.position_y = -100.0;
-        mSquarePoint.position_z = -453.0;
+        mSquarePoint.x = 0.0;
+        mSquarePoint.y = -100.0;
+        mSquarePoint.z = -453.0;
 
-        mTrianglePoint.position_x = 100.0;
-        mTrianglePoint.position_y = -100.0;
-        mTrianglePoint.position_z = -453.0;
+        mTrianglePoint.x = 100.0;
+        mTrianglePoint.y = -100.0;
+        mTrianglePoint.z = -453.0;
 
         z_start = 20;
         z_end = 10;
 
-        mPointA.position_x = 0.0;
-        mPointA.position_y = z_end;
-        mPointA.position_z = -453.0;
+        mPointA.x = 0.0;
+        mPointA.y = z_end;
+        mPointA.z = -453.0;
 
-        mPointB.position_x = -z_end;
-        mPointB.position_y = 0.0;
-        mPointB.position_z = -453.0;
+        mPointB.x = -z_end;
+        mPointB.y = 0.0;
+        mPointB.z = -453.0;
 
-        mPointC.position_x = 0.0;
-        mPointC.position_y = -z_end;
-        mPointC.position_z = -453.0;
+        mPointC.x = 0.0;
+        mPointC.y = -z_end;
+        mPointC.z = -453.0;
 
-        mPointD.position_x = z_end;
-        mPointD.position_y = 0.0;
-        mPointD.position_z = -453.0;
+        mPointD.x = z_end;
+        mPointD.y = 0.0;
+        mPointD.z = -453.0;
 
         vmax = 15000.0;
         amax = 130000.0;
@@ -104,7 +99,7 @@ public:
     }
 
 private:
-    vector<point_t *> my_point;
+    vector<Point *> my_point;
     bool status;
     bool is_send_status_to_node_a;
 
@@ -113,14 +108,14 @@ private:
     double z_start, z_end;
     double xx, yy, zz;
 
-    point mCurrentPoint;
-    point mPointA;
-    point mPointB;
-    point mPointC;
-    point mPointD;
-    point mCirclePoint;
-    point mSquarePoint;
-    point mTrianglePoint;
+    Point mCurrentPoint;
+    Point mPointA;
+    Point mPointB;
+    Point mPointC;
+    Point mPointD;
+    Point mCirclePoint;
+    Point mSquarePoint;
+    Point mTrianglePoint;
 
     std::mutex mProcessingMutex;
     std::condition_variable mConditionProcess;
@@ -143,43 +138,44 @@ private:
         bool is_proccess_ok = false;
         if (rclcpp::ok()) {
             while (false == is_proccess_ok) {
-                if ((mCurrentPoint.position_x == my_point[0]->position_x) &&
-                    (mCurrentPoint.position_y == my_point[0]->position_y) &&
-                    (mCurrentPoint.position_z == my_point[0]->position_z))
-                {
+                if (mCurrentPoint != *(my_point[0])) {
+                    RCLCPP_INFO(this->get_logger(), "process for next position\n");
+                    is_proccess_ok = true;
+                }
+                else {
                     RCLCPP_INFO(this->get_logger(), "remove duplicate point\n");
                     delete my_point[0];
                     my_point.erase(my_point.begin());
                     if(0 == my_point.size()) {
                         return;
                     }
-                }
-                else {
-                    RCLCPP_INFO(this->get_logger(), "process for next position\n");
-                    is_proccess_ok = true;
+                    else {
+                        mCurrentPoint = *(my_point[0]);
+                    }
                 }
             }
             
-            linear_speed_xyz.xo = mCurrentPoint.position_x;
-            linear_speed_xyz.yo = mCurrentPoint.position_y;
-            linear_speed_xyz.zo = mCurrentPoint.position_z;
-            linear_speed_xyz.xf = my_point[0]->position_x;
-            linear_speed_xyz.yf = my_point[0]->position_y;
-            linear_speed_xyz.zf = my_point[0]->position_z;
+            linear_speed_xyz.xo = mCurrentPoint.x;
+            linear_speed_xyz.yo = mCurrentPoint.y;
+            linear_speed_xyz.zo = mCurrentPoint.z;
+            linear_speed_xyz.xf = my_point[0]->x;
+            linear_speed_xyz.yf = my_point[0]->y;
+            linear_speed_xyz.zf = my_point[0]->z;
             linear_speed_xyz.vmax = vmax;
             linear_speed_xyz.amax = amax;
-            linear_speed_xyz.gripper = my_point[0]->gripper;
+            linear_speed_xyz.gripper = 0;
+            // linear_speed_xyz.gripper = my_point[0]->gripper;
             loop_rate.sleep();
             chatter_pub->publish(linear_speed_xyz);
 
             cout << "move from: " 
-                << mCurrentPoint.position_x << " " 
-                << mCurrentPoint.position_y << " " 
-                << mCurrentPoint.position_z
+                << mCurrentPoint.x << " " 
+                << mCurrentPoint.y << " " 
+                << mCurrentPoint.z
                 << " to: " 
-                << my_point[0]->position_x << " "
-                << my_point[0]->position_y << " " 
-                << my_point[0]->position_z << endl;
+                << my_point[0]->x << " "
+                << my_point[0]->y << " " 
+                << my_point[0]->z << endl;
 
             if (is_send_status_to_node_a) {
                 msg.data = "Point [" + to_string(xx) + " " + to_string(yy) + " " + to_string(zz) + "] is finished";
@@ -195,12 +191,8 @@ private:
     /// @param z 
     /// @param gripper 
     void add_point(double x, double y, double z, int gripper) {
-        point_t *data = new point_t;
-
-        data->position_x = x;
-        data->position_y = y;
-        data->position_z = z;
-        data->gripper = gripper;
+        Point *data = new Point(x, y, z);
+        // data->gripper = gripper;
         my_point.push_back(data);
 
         cout << "point added with x=" << x << ", y=" << y << ", z=" << z << ", gripper=" << gripper << endl;
@@ -209,14 +201,15 @@ private:
     /// @brief 
     /// @param msg 
     void Status_Delta_Callback(const std_msgs::msg::String::SharedPtr msg) {
-        RCLCPP_INFO(this->get_logger(), "status from main_node: [%s]\n", msg->data.c_str());
+        RCLCPP_INFO(this->get_logger(), "status from main_node: \n%s\n", msg->data.c_str());
 
         if (my_point.size() != 0) {
-            mCurrentPoint.position_x = my_point[0]->position_x;
-            mCurrentPoint.position_y = my_point[0]->position_y;
-            mCurrentPoint.position_z = my_point[0]->position_z;
+            mCurrentPoint = *(my_point[0]);
             delete my_point[0];
             my_point.erase(my_point.begin());
+        }
+
+        if (my_point.size() != 0) {
             is_send_status_to_node_a = true;
             MainProcessFunction();
         }
@@ -232,7 +225,7 @@ private:
 
         cout << "Processing point x: " << xx << " y: " << yy << " z: " << zz << endl;
 
-        add_point(mCurrentPoint.position_x, mCurrentPoint.position_y, mCurrentPoint.position_z, 0);
+        add_point(mCurrentPoint.x, mCurrentPoint.y, mCurrentPoint.z, 0);
 
         add_point(xx, yy, zz, 0);
         add_point(xx, yy, zz - z_start, 1);
@@ -240,21 +233,21 @@ private:
 
         switch (type) {
         case circle:
-            add_point(mCirclePoint.position_x, mCirclePoint.position_y, mCirclePoint.position_z, 1);
-            add_point(mCirclePoint.position_x, mCirclePoint.position_y, mCirclePoint.position_z - z_end, 0);
-            add_point(mCirclePoint.position_x, mCirclePoint.position_y, mCirclePoint.position_z, 0);
+            add_point(mCirclePoint.x, mCirclePoint.y, mCirclePoint.z, 1);
+            add_point(mCirclePoint.x, mCirclePoint.y, mCirclePoint.z - z_end, 0);
+            add_point(mCirclePoint.x, mCirclePoint.y, mCirclePoint.z, 0);
             break;
 
         case square:
-            add_point(mSquarePoint.position_x, mSquarePoint.position_y, mSquarePoint.position_z, 1);
-            add_point(mSquarePoint.position_x, mSquarePoint.position_y, mSquarePoint.position_z - z_end, 0);
-            add_point(mSquarePoint.position_x, mSquarePoint.position_y, mSquarePoint.position_z, 0);
+            add_point(mSquarePoint.x, mSquarePoint.y, mSquarePoint.z, 1);
+            add_point(mSquarePoint.x, mSquarePoint.y, mSquarePoint.z - z_end, 0);
+            add_point(mSquarePoint.x, mSquarePoint.y, mSquarePoint.z, 0);
             break;
 
         case triangle:
-            add_point(mTrianglePoint.position_x, mSquarePoint.position_y, mSquarePoint.position_z, 1);
-            add_point(mTrianglePoint.position_x, mSquarePoint.position_y, mSquarePoint.position_z - z_end, 0);
-            add_point(mTrianglePoint.position_x, mSquarePoint.position_y, mSquarePoint.position_z, 0);
+            add_point(mTrianglePoint.x, mSquarePoint.y, mSquarePoint.z, 1);
+            add_point(mTrianglePoint.x, mSquarePoint.y, mSquarePoint.z - z_end, 0);
+            add_point(mTrianglePoint.x, mSquarePoint.y, mSquarePoint.z, 0);
             break;
 
         default:
@@ -281,38 +274,38 @@ private:
 
         switch (temp) {
         case (CURRENT_POINT):
-            mCurrentPoint.position_x = msg->x0;
-            mCurrentPoint.position_y = msg->y0;
-            mCurrentPoint.position_z = msg->z0;
+            mCurrentPoint.x = msg->x0;
+            mCurrentPoint.y = msg->y0;
+            mCurrentPoint.z = msg->z0;
 
-            if (mCurrentPoint.position_z > -375 || mCurrentPoint.position_z < -480) {
-                mCurrentPoint.position_z = -375.0;
-                cout << "[ERROR] Invalid point, current point now set to x: " << mCurrentPoint.position_x << " y: " << mCurrentPoint.position_y << " z: " << mCurrentPoint.position_z << endl;
+            if (mCurrentPoint.z > -375 || mCurrentPoint.z < -480) {
+                mCurrentPoint.z = -375.0;
+                cout << "[ERROR] Invalid point, current point now set to x: " << mCurrentPoint.x << " y: " << mCurrentPoint.y << " z: " << mCurrentPoint.z << endl;
             } else {
-                cout << "current point set to point x: " << mCurrentPoint.position_x << " y: " << mCurrentPoint.position_y << " z: " << mCurrentPoint.position_z << endl;
+                cout << "current point set to point x: " << mCurrentPoint.x << " y: " << mCurrentPoint.y << " z: " << mCurrentPoint.z << endl;
             }
             zuo_bu_zuo = false;
             break;
 
         case (CIRCLE_POSITION):
-            mPointA.position_x = msg->x0;
-            mPointA.position_y = msg->y0;
-            mPointA.position_z = msg->z0;
-            cout << "Position to put CIRCLE is set to x: " << mPointA.position_x << " y: " << mPointA.position_y << " z: " << mPointA.position_z << endl;
+            mPointA.x = msg->x0;
+            mPointA.y = msg->y0;
+            mPointA.z = msg->z0;
+            cout << "Position to put CIRCLE is set to x: " << mPointA.x << " y: " << mPointA.y << " z: " << mPointA.z << endl;
             break;
 
         case (SQUARE_POSITION):
-            mPointB.position_x = msg->x0;
-            mPointB.position_y = msg->y0;
-            mPointB.position_z = msg->z0;
-            cout << "Position to put SQUARE is set to x: " << mPointB.position_x << " y: " << mPointB.position_y << " z: " << mPointB.position_z << endl;
+            mPointB.x = msg->x0;
+            mPointB.y = msg->y0;
+            mPointB.z = msg->z0;
+            cout << "Position to put SQUARE is set to x: " << mPointB.x << " y: " << mPointB.y << " z: " << mPointB.z << endl;
             break;
 
         case (TRIANGLE):
-            mPointC.position_x = msg->x0;
-            mPointC.position_y = msg->y0;
-            mPointC.position_z = msg->z0;
-            cout << "Position to put TRIANGLE is set to x: " << mPointC.position_x << " y: " << mPointC.position_y << " z: " << mPointC.position_z << endl;
+            mPointC.x = msg->x0;
+            mPointC.y = msg->y0;
+            mPointC.z = msg->z0;
+            cout << "Position to put TRIANGLE is set to x: " << mPointC.x << " y: " << mPointC.y << " z: " << mPointC.z << endl;
             break;
 
         case (Z_START):
@@ -354,25 +347,25 @@ private:
     /// @brief 
     void draw_new_square() {
         cout << "Draw Square" << endl;
-        // add_point(mCurrentPoint.position_x, mCurrentPoint.position_y, mCurrentPoint.position_z, 0);
-        add_point(mPointA.position_x, mPointA.position_y, mPointA.position_z - z_start, 0);
-        add_point(mPointB.position_x, mPointB.position_y, mPointB.position_z - z_start, 0);
-        add_point(mPointC.position_x, mPointC.position_y, mPointC.position_z - z_start, 0);
-        add_point(mPointD.position_x, mPointD.position_y, mPointD.position_z - z_start, 0);
-        add_point(mPointA.position_x, mPointA.position_y, mPointA.position_z - z_start, 0);
-        add_point(mCurrentPoint.position_x, mCurrentPoint.position_y, mCurrentPoint.position_z, 0);
+        // add_point(mCurrentPoint.x, mCurrentPoint.y, mCurrentPoint.z, 0);
+        add_point(mPointA.x, mPointA.y, mPointA.z - z_start, 0);
+        add_point(mPointB.x, mPointB.y, mPointB.z - z_start, 0);
+        add_point(mPointC.x, mPointC.y, mPointC.z - z_start, 0);
+        add_point(mPointD.x, mPointD.y, mPointD.z - z_start, 0);
+        add_point(mPointA.x, mPointA.y, mPointA.z - z_start, 0);
+        add_point(mCurrentPoint.x, mCurrentPoint.y, mCurrentPoint.z, 0);
 
     }
 
     /// @brief 
     void draw_new_triangle() {
         cout << "Draw Triangle" << endl;
-        // add_point(mCurrentPoint.position_x, mCurrentPoint.position_y, mCurrentPoint.position_z, 0);
-        add_point(mPointA.position_x, mPointA.position_y, mPointA.position_z - z_start, 0);
-        add_point(mPointB.position_x, mPointB.position_y, mPointB.position_z - z_start, 0);
-        add_point(mPointC.position_x, mPointC.position_y, mPointC.position_z - z_start, 0);
-        add_point(mPointA.position_x, mPointA.position_y, mPointA.position_z - z_start, 0);
-        add_point(mCurrentPoint.position_x, mCurrentPoint.position_y, mCurrentPoint.position_z, 0);
+        // add_point(mCurrentPoint.x, mCurrentPoint.y, mCurrentPoint.z, 0);
+        add_point(mPointA.x, mPointA.y, mPointA.z - z_start, 0);
+        add_point(mPointB.x, mPointB.y, mPointB.z - z_start, 0);
+        add_point(mPointC.x, mPointC.y, mPointC.z - z_start, 0);
+        add_point(mPointA.x, mPointA.y, mPointA.z - z_start, 0);
+        add_point(mCurrentPoint.x, mCurrentPoint.y, mCurrentPoint.z, 0);
     }
 };
 

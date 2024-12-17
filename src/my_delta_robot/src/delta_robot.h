@@ -5,6 +5,9 @@
 
 class delta_robot{
 private:
+    double vmax;
+    double amax;
+
     double CalculateAngleYZ(Point);
     Point unit_vector(Point point0, Point pointf);
     void angle_rotation(Point unit_vector);
@@ -13,9 +16,6 @@ private:
     void system_linear_invese(double xprima, double(&xyz_res)[4]);
 
 public:
-    double vmax;
-    double amax;
-
     unsigned int num_point_1;
     unsigned int num_point_2;
 
@@ -45,5 +45,7 @@ public:
     void system_linear_matrix(void);
     void CreateJointStateList(Point point, Theta theta, int gripper, double(&position)[13]);
     void InverseAllJointStateExist(void);
+
+    void set_vmax_amax(unsigned int vmax, unsigned int amax);
 };
 #endif

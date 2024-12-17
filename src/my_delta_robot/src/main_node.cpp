@@ -54,8 +54,7 @@ public:
         JointState.name[12] = "gripper";
 
         m_delta_robot = new delta_robot(); // construct a new delta_robot
-        m_delta_robot->vmax = 1500;
-        m_delta_robot->amax = 200000;
+        m_delta_robot->set_vmax_amax(1500, 200000); // set vmax and amax
         m_delta_robot->num_point_1 = 120;
         m_delta_robot->num_point_2 = 120;
         // Create a thread to call main_func
@@ -102,8 +101,6 @@ private:
     void main_func() {
         double delta = 0;
         if (rclcpp::ok()) {
-            RCLCPP_INFO(this->get_logger(), "v_max = %lf, a_max = %lf", m_delta_robot->vmax, m_delta_robot->amax);
-
             m_delta_robot->system_linear();
             m_delta_robot->TrapezoidalVelocityProfile(); // Trapezoidal velocity profile
             m_delta_robot->system_linear_matrix();
@@ -112,11 +109,11 @@ private:
             RCLCPP_INFO(this->get_logger(), "Creating Linear Path RVIZ!");
 
             // publish data of velocity and acceleration to visualize on rpt_plot
-            // vm_am.vmax = m_delta_robot->m_data_delta[0]->vel;
-            // vm_am.amax = m_delta_robot->m_data_delta[0]->acel;
-            // v_a_out->publish(vm_am);
+            vm_am.vmax = m_delta_robot->m_data_delta[0]->vel;
+            vm_am.amax = m_delta_robot->m_data_delta[0]->acel;
+            v_a_out->publish(vm_am);
 
-            for (unsigned int i = 0; i < m_delta_robot->m_data_delta.size(); i++) {
+            for (unsigned int i = 1; i < m_delta_robot->m_data_delta.size(); i++) {
                 m_delta_robot->m_data_delta[i]->theta_val = m_delta_robot->inverse(m_delta_robot->m_data_delta[i]->position_val);
                 m_delta_robot->CreateJointStateList(
                     m_delta_robot->m_data_delta[i]->position_val,
@@ -144,7 +141,12 @@ private:
             }
 
             // dump status
-            msg.data = "from " + std::to_string(m_delta_robot->mStartPoint.x) + " " + std::to_string(m_delta_robot->mStartPoint.y) + " " + std::to_string(m_delta_robot->mStartPoint.z) + " to " + std::to_string(m_delta_robot->mEndPoint.x) + " " + std::to_string(m_delta_robot->mEndPoint.y) + " " + std::to_string(m_delta_robot->mEndPoint.z) + " is finished";
+            msg.data = "(" + std::to_string(m_delta_robot->mStartPoint.x) + ", " 
+                        + std::to_string(m_delta_robot->mStartPoint.y) + ", " 
+                        + std::to_string(m_delta_robot->mStartPoint.z) + ") -> (" 
+                        + std::to_string(m_delta_robot->mEndPoint.x) + ", " 
+                        + std::to_string(m_delta_robot->mEndPoint.y) + ", " 
+                        + std::to_string(m_delta_robot->mEndPoint.z) + ") DONE";
             status_to_node_b->publish(msg);
         }
     }

@@ -472,6 +472,14 @@ void delta_robot::InverseAllJointStateExist(void) {
 }
 
 /// @brief 
+/// @param vmax 
+/// @param amax 
+void delta_robot::set_vmax_amax(unsigned int vmax, unsigned int amax) {
+    this->vmax = vmax;
+    this->amax = amax;
+}
+
+/// @brief 
 /// @param mStartPoint 
 /// @return 
 Theta delta_robot::inverse(Point point) {
@@ -491,8 +499,8 @@ Theta delta_robot::inverse(Point point) {
     point_temp.z = point.z;
     theta.angle1 = angle_yz(point_temp); // rotate to -120 deg
 
-    cout << "with x=" << point_temp.x << ", y=" << point_temp.y << ", z=" << point_temp.z ;
-    cout << " then thetal=" << theta.angle1 << ", theta2=" << theta.angle2 << ", theta3=" << theta.angle3 << endl;
+    cout << "Point=(" << point_temp.x << ", " << point_temp.y << ", " << point_temp.z ;
+    cout << ") -> Thetal=(" << theta.angle1 << ", " << theta.angle2 << ", " << theta.angle3 << ")" << endl;
     
     return theta;
 }
