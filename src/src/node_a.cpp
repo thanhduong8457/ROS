@@ -29,21 +29,21 @@ bool is_send_status_to_image_node;
 
 void add_point(double x, double y, double z, int type);
 void status_delta_callback(const std_msgs::msg::String::SharedPtr msg);
-void data_image_callback(const my_delta_robot::msg::ImagePos::SharedPtr msg);
+void data_image_callback(const delta_robot::msg::ImagePos::SharedPtr msg);
 
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("node_a");
 
-    auto data_image = node->create_subscription<my_delta_robot::msg::ImagePos>("data_image", 10, data_image_callback);
+    auto data_image = node->create_subscription<delta_robot::msg::ImagePos>("data_image", 10, data_image_callback);
     auto sub_status_delta = node->create_subscription<std_msgs::msg::String>("status_to_node_a", 10, status_delta_callback);
 
-    auto chatter_pub = node->create_publisher<my_delta_robot::msg::Posicionxyz>("send_to_node_b", 10);
+    auto chatter_pub = node->create_publisher<delta_robot::msg::Posicionxyz>("send_to_node_b", 10);
     auto status_to_image_node = node->create_publisher<std_msgs::msg::String>("status_to_image_node", 10);
 
     rclcpp::Rate loop_rate(1);
 
-    my_delta_robot::msg::Posicionxyz posicionxyz;
+    delta_robot::msg::Posicionxyz posicionxyz;
     std_msgs::msg::String msg;
 
     status = false;
@@ -108,7 +108,7 @@ void status_delta_callback(const std_msgs::msg::String::SharedPtr msg) {
 
 /// @brief 
 /// @param msg 
-void data_image_callback(const my_delta_robot::msg::ImagePos::SharedPtr msg) {
+void data_image_callback(const delta_robot::msg::ImagePos::SharedPtr msg) {
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "receive status from camera");
     for (size_t i = 0; i < msg->x.size(); i++) {
         add_point(msg->x[i], msg->y[i], msg->z[i], msg->type[i]);

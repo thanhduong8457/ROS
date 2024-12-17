@@ -5,13 +5,10 @@ double A1[3] = {(hf * mmtm) / 3, 0, 0};
 double A2[3] = {-A1[0] * cos(60 * dtr), -A1[0] * sin(60 * dtr), 0};
 double A3[3] = {A2[0], -A2[1], 0};
 
-//###############################################
-//######[ punto_codo  (J 1,2,3) ] ##############
-//###############################################
-//|------------------------------------------|
-//|---------------- punto_codo  -------------|
-//|------------------------------------------|
 //Plano XZ
+/// @brief punto_codo  (J 1,2,3)
+/// @param theta 
+/// @param b1 
 void punto_codo(double theta, double (&b1)[3]) {
     theta *= dtr;
     b1[0] = A1[0] + rf * mmtm * cos(theta);
@@ -19,32 +16,28 @@ void punto_codo(double theta, double (&b1)[3]) {
     b1[2] = rf * mmtm * sin(theta);
 }
 
-//|------------------------------------------|
-//|-------------- rotation120 ---------------|
-//|------------------------------------------|
+/// @brief rotation120
+/// @param ent 
+/// @param sal 
 void rotation120(double ent[3], double(&sal)[3]) {
     sal[0] = cos120 * ent[0] + sin120 * ent[1];
     sal[1] = -sin120 * ent[0] + cos120 * ent[1];
     sal[2] = ent[2];
 }
 
-//|------------------------------------------|
-//|---------------- rotation240 -------------|
-//|------------------------------------------|
+/// @brief rotation240
+/// @param ent 
+/// @param sal 
 void rotation240(double ent[3], double(&sal)[3]) {
     sal[0] = cos240 * ent[0] + sin240 * ent[1];
     sal[1] = -sin240 * ent[0] + cos240 * ent[1];
     sal[2] = ent[2];
 }
 
-//###############################################
-//######[ punto_ee  EE1,2,3 ] ###################
-//###############################################
-//|------------------------------------------|
-//|-------------- punto_ee ------------------|
-//|------------------------------------------|
-//Distancia de Punto centrar efector al punto EE y girar por motor
-
+/// @brief punto_ee  EE1,2,3 ]
+/// @param eee 
+/// @param brazo 
+/// @param sal 
 void punto_ee(double eee[3], int brazo, double (&sal)[3]) {
     double vhe2[3] = { (he * mmtm) / 3, 0.0, 0.0 };
     double vhe3[3] = { 0, 0, 0 };
@@ -59,21 +52,22 @@ void punto_ee(double eee[3], int brazo, double (&sal)[3]) {
 
 }
 
-//|------------------------------------------|
-//|--------------- sumav --------------------|
-//|------------------------------------------|
+/// @brief 
+/// @param v1 
+/// @param v2 
+/// @param s 
 void sumav(double v1[3], double v2[3], double (&s)[3]) {
     s[0] = v1[0] + v2[0];
     s[1] = v1[1] + v2[1];
     s[2] = v1[2] + v2[2];
 }
 
-//###############################################
-//#########[ angulos_codo ] ####################
-//###############################################
-//|------------------------------------------|
-//|-------------- angulos_codo --------------|
-//|------------------------------------------|
+/// @brief angulos_codo
+/// @param codo 
+/// @param eee 
+/// @param brazo 
+/// @param ang_a 
+/// @param ang_b 
 void angulos_codo(double codo[3], double eee[3], int brazo, double &ang_a, double &ang_b) {
     double _codo[3] = {};
     double _eee[3] = {};
@@ -115,9 +109,10 @@ void angulos_codo(double codo[3], double eee[3], int brazo, double &ang_a, doubl
     else ang_b = 0;
 }
 
-//|------------------------------------------|
-//|-------------- rotation_y ----------------|
-//|------------------------------------------|
+/// @brief rotation_y
+/// @param ent 
+/// @param ang 
+/// @param sal 
 void rotation_y(double ent[3], double ang, double(&sal)[3]) {
     sal[0] = ent[0] * cos(ang) - ent[2] * sin(ang);
     sal[1] = ent[1];

@@ -139,11 +139,11 @@ private:
         if (rclcpp::ok()) {
             while (false == is_proccess_ok) {
                 if (mCurrentPoint != *(my_point[0])) {
-                    RCLCPP_INFO(this->get_logger(), "process for next position\n");
+                    cout << "process for next position\n";
                     is_proccess_ok = true;
                 }
                 else {
-                    RCLCPP_INFO(this->get_logger(), "remove duplicate point\n");
+                    RCLCPP_INFO(this->get_logger(), "remove duplicate point");
                     delete my_point[0];
                     my_point.erase(my_point.begin());
                     if(0 == my_point.size()) {
@@ -168,14 +168,14 @@ private:
             loop_rate.sleep();
             chatter_pub->publish(linear_speed_xyz);
 
-            cout << "move from: " 
-                << mCurrentPoint.x << " " 
-                << mCurrentPoint.y << " " 
+            cout << "Move from (" 
+                << mCurrentPoint.x << ", " 
+                << mCurrentPoint.y << ", " 
                 << mCurrentPoint.z
-                << " to: " 
-                << my_point[0]->x << " "
-                << my_point[0]->y << " " 
-                << my_point[0]->z << endl;
+                << ") to (" 
+                << my_point[0]->x << ", "
+                << my_point[0]->y << ", " 
+                << my_point[0]->z << ")" << endl;
 
             if (is_send_status_to_node_a) {
                 msg.data = "Point [" + to_string(xx) + " " + to_string(yy) + " " + to_string(zz) + "] is finished";
@@ -201,7 +201,7 @@ private:
     /// @brief 
     /// @param msg 
     void Status_Delta_Callback(const std_msgs::msg::String::SharedPtr msg) {
-        RCLCPP_INFO(this->get_logger(), "status from main_node: \n%s\n", msg->data.c_str());
+        RCLCPP_INFO(this->get_logger(), "status from main_node: \n%s", msg->data.c_str());
 
         if (my_point.size() != 0) {
             mCurrentPoint = *(my_point[0]);

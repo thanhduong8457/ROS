@@ -43,9 +43,9 @@ std::atomic<bool> mSignalScheduleSwitch(false);
 
 void add_point(double x, double y, double z, int gripper);
 void Status_Delta_Callback(const std_msgs::msg::String::SharedPtr msg);
-void node_a_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg);
-void set_vmax_amax_callback(const my_delta_robot::msg::VmaxAmax::SharedPtr msg);
-void set_current_point_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg);
+void node_a_callback(const delta_robot::msg::Posicionxyz::SharedPtr msg);
+void set_vmax_amax_callback(const delta_robot::msg::VmaxAmax::SharedPtr msg);
+void set_current_point_callback(const delta_robot::msg::Posicionxyz::SharedPtr msg);
 
 /// @brief 
 /// @param argc 
@@ -55,17 +55,17 @@ int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("node_b");
 
-    auto receive_node_a = node->create_subscription<my_delta_robot::msg::Posicionxyz>("send_to_node_b", 10, node_a_callback);
-    auto set_vmax_amax = node->create_subscription<my_delta_robot::msg::VmaxAmax>("set_vmax_amax", 10, set_vmax_amax_callback);
-    auto set_current_point = node->create_subscription<my_delta_robot::msg::Posicionxyz>("set_current_point", 10, set_current_point_callback);
+    auto receive_node_a = node->create_subscription<delta_robot::msg::Posicionxyz>("send_to_node_b", 10, node_a_callback);
+    auto set_vmax_amax = node->create_subscription<delta_robot::msg::VmaxAmax>("set_vmax_amax", 10, set_vmax_amax_callback);
+    auto set_current_point = node->create_subscription<delta_robot::msg::Posicionxyz>("set_current_point", 10, set_current_point_callback);
     auto sub_status_delta = node->create_subscription<std_msgs::msg::String>("status_delta", 10, Status_Delta_Callback);
 
-    auto chatter_pub = node->create_publisher<my_delta_robot::msg::LinearSpeedXYZ>("input_ls_final", 10);
+    auto chatter_pub = node->create_publisher<delta_robot::msg::LinearSpeedXYZ>("input_ls_final", 10);
     auto status_to_node_a = node->create_publisher<std_msgs::msg::String>("status_to_node_a", 10);
 
     rclcpp::Rate loop_rate(1);
 
-    my_delta_robot::msg::LinearSpeedXYZ linear_speed_xyz;
+    delta_robot::msg::LinearSpeedXYZ linear_speed_xyz;
     std_msgs::msg::String msg;
 
     // Setting default values
@@ -168,7 +168,7 @@ void Status_Delta_Callback(const std_msgs::msg::String::SharedPtr msg) {
 
 /// @brief receive point to grip from node a thought "send_to_node_b", -> create the action for process by add 3 sub moveverment
 /// @param msg 
-void node_a_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
+void node_a_callback(const delta_robot::msg::Posicionxyz::SharedPtr msg) {
     xx = msg->x0;
     yy = msg->y0;
     zz = msg->z0;
@@ -212,7 +212,7 @@ void node_a_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
 
 /// @brief 
 /// @param msg 
-void set_vmax_amax_callback(const my_delta_robot::msg::VmaxAmax::SharedPtr msg) {
+void set_vmax_amax_callback(const delta_robot::msg::VmaxAmax::SharedPtr msg) {
     vmax = msg->vmax;
     amax = msg->amax;
     cout << "set vmax = " << vmax << ", and set amax = " << amax << endl;
@@ -220,7 +220,7 @@ void set_vmax_amax_callback(const my_delta_robot::msg::VmaxAmax::SharedPtr msg) 
 
 /// @brief 
 /// @param msg 
-void set_current_point_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
+void set_current_point_callback(const delta_robot::msg::Posicionxyz::SharedPtr msg) {
     int temp = msg->type;
 
     switch (temp) {

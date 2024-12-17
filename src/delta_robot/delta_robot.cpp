@@ -1,10 +1,13 @@
 #include "delta_robot.h"
 
+/// @brief 
+/// @param  
 delta_robot::delta_robot(void) {
-    // data = new data_delta_t;
     initialize();
 }
 
+/// @brief 
+/// @param  
 delta_robot::~delta_robot(void) {
     while (!m_data_delta.empty()) {
         delete m_data_delta.back();
@@ -12,6 +15,8 @@ delta_robot::~delta_robot(void) {
     }
 }
 
+/// @brief 
+/// @param  
 void delta_robot::initialize(void) {
     this->vmax = 1500;
     this->amax = 200000;
@@ -40,20 +45,6 @@ Point delta_robot::unit_vector(Point point0, Point pointf) {
     return_point.z = delta_z / modulo;
     return return_point;
 }
-
-// void delta_robot::path_linear_speed(double xo,double yo,double zo,double xf,double yf,double zf)
-// {
-//    //######  international units change  ##########
-//    double xoo = xo * mmtm;
-//    double yoo = yo * mmtm;
-//    double zoo = zo * mmtm;
-//    double xff = xf * mmtm;
-//    double yff = yf * mmtm;
-//    double zff = zf * mmtm;
-
-//    system_linear(xoo, yoo, zoo, xff, yff, zff);
-
-// }
 
 /// @brief 
 /// @param mStartPoint 
@@ -189,6 +180,11 @@ void delta_robot::angle_rotation(Point unit_vector) {
     }
 }
 
+/// @brief 
+/// @param x0 
+/// @param y0 
+/// @param z0 
+/// @return 
 double delta_robot::delta_calcAngleYZ(double x0, double y0, double z0) {
     double y1 = -0.5 * 0.57735 * ff; // f/2 * tg 30
     y0 -= 0.5 * 0.57735 * ee;        // shift center to edge
@@ -290,7 +286,7 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
 
 /// @brief 
 /// @param q0 
-/// @param this->dis 
+/// @param dis 
 /// @param vmax 
 /// @param amax 
 /// @param tactual 
@@ -346,6 +342,7 @@ void delta_robot::ls_v_a_puntual(
 }
 
 /// @brief 
+/// @param  
 void delta_robot::system_linear_matrix(void) {
     theta_y = theta_y * dtr;
     theta_z = theta_z * dtr;
@@ -362,7 +359,7 @@ void delta_robot::system_linear_matrix(void) {
         m_data_delta[i]->position_val.z = xyz_res[2];
         cout << "x=" << xyz_res[0] << ", y=" << xyz_res[1] << ", z=" << xyz_res[2] << endl;
         
-        // // ######  velocidad xyz  ##########
+        // // ######  velocidad xyz  ########## 来
         // system_linear_invese(m_data_delta[i]->vel, rot_z, rot_y, theta_y, theta_z, rot_tras, xyz_res);
         // m_data_delta[i]->vel_x = xyz_res[0][0];
         // m_data_delta[i]->vel_y = xyz_res[1][0];
@@ -569,7 +566,6 @@ double delta_robot::angle_yz(Point point) {
 void delta_robot::CreateJointStateList(
     Point pointi,
     Theta theta,
-    int gripper, 
     double (&position)[13]
 ) {
     // Rviz interior angles in Radians
@@ -616,5 +612,5 @@ void delta_robot::CreateJointStateList(
     position[9]  = pointi.x;
     position[10] = pointi.y;
     position[11] = pointi.z;
-    position[12] = gripper;
+    // position[12] = gripper;
 }

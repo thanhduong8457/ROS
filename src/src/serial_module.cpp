@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
     auto node = rclcpp::Node::make_shared("serial_module");
 
     auto sub = node->create_subscription<sensor_msgs::msg::JointState>("/joint_states", 10, MoveGroupCallback);
-    auto chatter_pub = node->create_publisher<my_delta_robot::msg::PositionArm>("thanhduong", 10);
+    auto chatter_pub = node->create_publisher<delta_robot::msg::PositionArm>("thanhduong", 10);
 
     try {
         ser.setPort("/dev/ttyTHS1");
@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
 
     rclcpp::Rate loop_rate(50);
 
-    my_delta_robot::msg::PositionArm PositionArm;
+    delta_robot::msg::PositionArm PositionArm;
 
     while (rclcpp::ok()) {
         PositionArm.base_brazo1 = my_joint[0]->position;

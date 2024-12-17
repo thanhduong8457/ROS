@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
     auto node = rclcpp::Node::make_shared("node_a");
 
     auto sub_status_delta = node->create_subscription<std_msgs::msg::String>("status_to_node_a", 10, Status_Delta_Callback);
-    auto chatter_pub = node->create_publisher<my_delta_robot::msg::Posicionxyz>("send_to_node_b", 10);
+    auto chatter_pub = node->create_publisher<delta_robot::msg::Posicionxyz>("send_to_node_b", 10);
 
     rclcpp::Rate loop_rate(1);
 
@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
         add_point(0.0, 100.0, -453.0, square);
     }
 
-    my_delta_robot::msg::Posicionxyz posicionxyz;
+    delta_robot::msg::Posicionxyz posicionxyz;
     status = true;
 
     while (rclcpp::ok()) {

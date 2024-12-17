@@ -1,5 +1,5 @@
 {
-    "cmake.sourceDirectory": "/Users/thanhduong/Documents/Embeded_Project/ROS/src/my_delta_robot",
+    "cmake.sourceDirectory": "/Users/thanhduong/Documents/Embeded_Project/ROS/src/delta_robot",
     "cmake.configureArgs": [
         // "-DPython3_FIND_VIRTUALENV=ONLY"
     ],
@@ -70,6 +70,8 @@
         "system_error": "cpp",
         "typeindex": "cpp",
         "unordered_set": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "deque": "cpp",
+        "stack": "cpp"
     }
 }

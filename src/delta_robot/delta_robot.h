@@ -35,7 +35,6 @@ public:
 
     void initialize(void);
 
-    //void path_linear_speed(double xo, double yo, double zo, double xf, double yf, double zf);
     Theta inverse(Point point0);
 
     void TrapezoidalVelocityProfile(void);
@@ -43,7 +42,7 @@ public:
 
     void system_linear(void);
     void system_linear_matrix(void);
-    void CreateJointStateList(Point point, Theta theta, int gripper, double(&position)[13]);
+    void CreateJointStateList(Point point, Theta theta, double(&position)[13]);
     void InverseAllJointStateExist(void);
 
     void set_vmax_amax(unsigned int vmax, unsigned int amax);

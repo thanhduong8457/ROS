@@ -7,6 +7,7 @@ endif()
 
 # Add the directory containing Findserial.cmake to CMAKE_MODULE_PATH
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DPython3_FIND_VIRTUALENV=ONLY")
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -33,19 +34,25 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES geometry_msgs
 )
 
-include_directories(include ${ament_INCLUDE_DIRS})
+include_directories(
+  delta_robot 
+  ${ament_INCLUDE_DIRS}
+)
 
-add_executable(main_node src/main_node.cpp src/common.cpp src/delta_robot.cpp)
+add_subdirectory(delta_robot)
+
+add_executable(main_node src/main_node.cpp)
 ament_target_dependencies(main_node rclcpp std_msgs sensor_msgs urdf geometry_msgs)
+target_link_libraries(main_node delta_robot)
 rosidl_target_interfaces(main_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-add_executable(node_b src/node_b.cpp)
-ament_target_dependencies(node_b rclcpp std_msgs sensor_msgs urdf geometry_msgs)
-rosidl_target_interfaces(node_b ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# add_executable(node_b src/node_b.cpp)
+# ament_target_dependencies(node_b rclcpp std_msgs sensor_msgs urdf geometry_msgs)
+# rosidl_target_interfaces(node_b ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-add_executable(node_a src/node_a.cpp)
-ament_target_dependencies(node_a rclcpp std_msgs sensor_msgs urdf geometry_msgs)
-rosidl_target_interfaces(node_a ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# add_executable(node_a src/node_a.cpp)
+# ament_target_dependencies(node_a rclcpp std_msgs sensor_msgs urdf geometry_msgs)
+# rosidl_target_interfaces(node_a ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 # add_executable(serial_module src/serial_module.cpp)
 # ament_target_dependencies(serial_module rclcpp std_msgs sensor_msgs urdf geometry_msgs)
@@ -54,18 +61,19 @@ rosidl_target_interfaces(node_a ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(draw src/draw.cpp)
 ament_target_dependencies(draw rclcpp std_msgs sensor_msgs urdf geometry_msgs)
+target_link_libraries(draw delta_robot)
 rosidl_target_interfaces(draw ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-add_executable(test_acuracy src/test_acuracy.cpp)
-ament_target_dependencies(test_acuracy rclcpp std_msgs sensor_msgs urdf geometry_msgs)
-rosidl_target_interfaces(test_acuracy ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# add_executable(test_acuracy src/test_acuracy.cpp)
+# ament_target_dependencies(test_acuracy rclcpp std_msgs sensor_msgs urdf geometry_msgs)
+# rosidl_target_interfaces(test_acuracy ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 install(TARGETS 
   main_node
-  node_a
-  node_b
+  # node_a
+  # node_b
   draw
-  test_acuracy
+  # test_acuracy
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -104,7 +104,6 @@ private:
             m_delta_robot->system_linear();
             m_delta_robot->TrapezoidalVelocityProfile(); // Trapezoidal velocity profile
             m_delta_robot->system_linear_matrix();
-            // m_delta_robot->InverseAllJointStateExist(); // Inverse kinematics
 
             RCLCPP_INFO(this->get_logger(), "Creating Linear Path RVIZ!");
 
@@ -115,19 +114,17 @@ private:
 
             for (unsigned int i = 1; i < m_delta_robot->m_data_delta.size(); i++) {
                 m_delta_robot->m_data_delta[i]->theta_val = m_delta_robot->inverse(m_delta_robot->m_data_delta[i]->position_val);
-                m_delta_robot->CreateJointStateList(
-                    m_delta_robot->m_data_delta[i]->position_val,
-                    m_delta_robot->m_data_delta[i]->theta_val,
-                    gripper,
+                m_delta_robot->CreateJointStateList(m_delta_robot->m_data_delta[i]->position_val,m_delta_robot->m_data_delta[i]->theta_val,
                     position_value);
 
                 delta = m_delta_robot->m_data_delta[i]->time_point * 10 - m_delta_robot->m_data_delta[i - 1]->time_point * 10; // bug index out range
 
                 // publish data of joints state to topic /joint_states
-                for (int j = 0; j < 13; j++) {
+                for (int j = 0; j < 12; j++) {
                     JointState.position[j] = position_value[j];
                 }
-                    
+
+                JointState.position[12] = gripper;
                 JointState.header.stamp = this->now();
                 pub_for_rviz->publish(JointState);
 

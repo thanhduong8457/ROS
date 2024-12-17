@@ -4,7 +4,7 @@ import cv2
 import math
 
 from std_msgs.msg import String
-from my_delta_robot.msg import image_pos
+from delta_robot.msg import image_pos
 
 GSTREAMER_PIPELINE = 'nvarguscamerasrc ! video/x-raw(memory:NVMM), width=1920, height=1080, format=(string)NV12, framerate=10/1 ! nvvidconv flip-method=0 ! video/x-raw, width=960, height=616, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink wait-on-eos=false max-buffers=1 drop=True'
 

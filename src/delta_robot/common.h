@@ -34,6 +34,7 @@ public:
     }
 };
 
+/// @brief 
 class Theta {
 public:
     double angle1;
@@ -57,23 +58,24 @@ public:
     }
 };
 
+/// @brief 
 typedef struct data_delta {
     double pos;     //
     Point position_val;
 
-    double vel;     //
+    double vel; //
     double vel_x;
     double vel_y;
     double vel_z;
 
-    double acel;    //
+    double acel; //
     double acel_x;
     double acel_y;
     double acel_z;
 
     Theta theta_val;
 
-    double time_point;  //
+    double time_point; //
 }data_delta_t;
 
 void punto_codo(double theta, double(&b1)[3]);
