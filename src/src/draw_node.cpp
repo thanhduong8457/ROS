@@ -41,7 +41,6 @@ public:
         RCLCPP_INFO(this->get_logger(), "draw_node is created");
 
         receive_node_a = this->create_subscription<my_delta_robot::msg::Posicionxyz>("send_to_node_b", 10, std::bind(&Draw::node_a_callback, this, std::placeholders::_1));
-        set_vmax_amax = this->create_subscription<my_delta_robot::msg::VmaxAmax>("set_vmax_amax", 10, std::bind(&Draw::set_vmax_amax_callback, this, std::placeholders::_1));
         set_current_point = this->create_subscription<my_delta_robot::msg::Posicionxyz>("set_current_point", 10, std::bind(&Draw::set_current_point_callback, this, std::placeholders::_1));
         sub_status_delta = this->create_subscription<std_msgs::msg::String>("status_delta", 10, std::bind(&Draw::Status_Delta_Callback, this, std::placeholders::_1));
 
@@ -84,9 +83,6 @@ public:
         mPointD.y = 0.0;
         mPointD.z = -453.0;
 
-        vmax = 15000.0;
-        amax = 130000.0;
-
         status = false;
         is_send_status_to_node_a = false;
 
@@ -102,8 +98,6 @@ private:
     vector<Point *> my_point;
     bool status;
     bool is_send_status_to_node_a;
-
-    double vmax, amax;
 
     double z_start, z_end;
     double xx, yy, zz;
@@ -124,7 +118,6 @@ private:
 
     rclcpp::Rate loop_rate;
     std::shared_ptr<rclcpp::Subscription<my_delta_robot::msg::Posicionxyz>> receive_node_a;
-    std::shared_ptr<rclcpp::Subscription<my_delta_robot::msg::VmaxAmax>> set_vmax_amax;
     std::shared_ptr<rclcpp::Subscription<my_delta_robot::msg::Posicionxyz>> set_current_point;
     std::shared_ptr<rclcpp::Subscription<std_msgs::msg::String>> sub_status_delta;
     std::shared_ptr<rclcpp::Publisher<my_delta_robot::msg::LinearSpeedXYZ>> chatter_pub;
@@ -161,8 +154,6 @@ private:
             linear_speed_xyz.xf = my_point[0]->x;
             linear_speed_xyz.yf = my_point[0]->y;
             linear_speed_xyz.zf = my_point[0]->z;
-            linear_speed_xyz.vmax = vmax;
-            linear_speed_xyz.amax = amax;
             linear_speed_xyz.gripper = 0;
             // linear_speed_xyz.gripper = my_point[0]->gripper;
             loop_rate.sleep();
@@ -255,14 +246,6 @@ private:
         }
 
         MainProcessFunction();
-    }
-
-    /// @brief 
-    /// @param msg 
-    void set_vmax_amax_callback(const my_delta_robot::msg::VmaxAmax::SharedPtr msg) {
-        vmax = msg->vmax;
-        amax = msg->amax;
-        cout << "set vmax = " << vmax << ", and set amax = " << amax << endl;
     }
 
     /// @brief 

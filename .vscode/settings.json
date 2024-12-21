@@ -72,6 +72,8 @@
         "unordered_set": "cpp",
         "variant": "cpp",
         "deque": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "functional": "cpp",
+        "type_traits": "cpp"
     }
 }

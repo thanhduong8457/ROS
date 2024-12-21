@@ -10,7 +10,6 @@
 #include "delta_robot.h"
 
 class MyNode: public rclcpp::Node {
-public:
     int gripper;
     delta_robot *m_delta_robot;
 
@@ -22,15 +21,20 @@ public:
     std_msgs::msg::String msg;
 
     std::shared_ptr<rclcpp::Subscription<my_delta_robot::msg::LinearSpeedXYZ>> receive_node_a;
+    std::shared_ptr<rclcpp::Subscription<my_delta_robot::msg::NumPoint>> set_num_point;
+    std::shared_ptr<rclcpp::Subscription<my_delta_robot::msg::VmaxAmax>> set_vmax_amax;
+
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::JointState>> pub_for_rviz;
     std::shared_ptr<rclcpp::Publisher<std_msgs::msg::String>> status_to_node_b;
     std::shared_ptr<rclcpp::Publisher<my_delta_robot::msg::VmaxAmax>> v_a_out;
 
+public:
     MyNode():Node("main_node"), loop_rate(7.8125) {
         RCLCPP_INFO(this->get_logger(), "main_node is created");
 
         receive_node_a = this->create_subscription<my_delta_robot::msg::LinearSpeedXYZ>("input_ls_final", 10, std::bind(&MyNode::callback_linear_speed_xyz, this, std::placeholders::_1));
-        auto set_num_point = this->create_subscription<my_delta_robot::msg::NumPoint>("set_num_point", 10, std::bind(&MyNode::set_num_point_callback, this, std::placeholders::_1));
+        set_num_point = this->create_subscription<my_delta_robot::msg::NumPoint>("set_num_point", 10, std::bind(&MyNode::set_num_point_callback, this, std::placeholders::_1));
+        set_vmax_amax = this->create_subscription<my_delta_robot::msg::VmaxAmax>("set_vmax_amax", 10, std::bind(&MyNode::set_vmax_amax_callback, this, std::placeholders::_1));
 
         pub_for_rviz = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
         status_to_node_b = this->create_publisher<std_msgs::msg::String>("status_delta", 10);
@@ -146,6 +150,13 @@ private:
                         + std::to_string(m_delta_robot->mEndPoint.z) + ") DONE";
             status_to_node_b->publish(msg);
         }
+    }
+
+    /// @brief 
+    /// @param msg 
+    void set_vmax_amax_callback(const my_delta_robot::msg::VmaxAmax::SharedPtr msg) {
+        m_delta_robot->set_vmax_amax(msg->vmax, msg->amax);
+        cout << "set vmax = " << msg->vmax << ", and set amax = " << msg->amax << endl;
     }
 };
 
