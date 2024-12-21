@@ -37,8 +37,8 @@ enum {
 
 class Draw : public rclcpp::Node {
 public:
-    Draw() : Node("draw"), loop_rate(1) {
-        RCLCPP_INFO(this->get_logger(), "draw is created");
+    Draw() : Node("draw_node"), loop_rate(1) {
+        RCLCPP_INFO(this->get_logger(), "draw_node is created");
 
         receive_node_a = this->create_subscription<my_delta_robot::msg::Posicionxyz>("send_to_node_b", 10, std::bind(&Draw::node_a_callback, this, std::placeholders::_1));
         set_vmax_amax = this->create_subscription<my_delta_robot::msg::VmaxAmax>("set_vmax_amax", 10, std::bind(&Draw::set_vmax_amax_callback, this, std::placeholders::_1));
