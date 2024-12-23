@@ -1,19 +1,26 @@
 {
-  "configurations": [
-    {
-      "name": "macos-clang-arm64",
-      "includePath": [
-        "${workspaceFolder}/**",
-        "${workspaceFolder}/src/**",
-        "${workspaceFolder}/src/delta_robot/**",
-        "/home/thanhduong/ros2_humble/install/**",
-        "/home/thanhduong/ros2_humble/build/**"
-      ],
-      "defines": [""],
-      "cStandard": "${default}",
-      "cppStandard": "${default}",
-      "intelliSenseMode": "macos-clang-arm64"
-    }
-  ],
-  "version": 4
+    "configurations": [
+        {
+            "name": "macos-clang-arm64",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/src/**",
+                "${workspaceFolder}/src/delta_robot/**",
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/**",
+                "/Users/thanhduong/miniconda3/envs/ros2/include/**",
+                "/Users/thanhduong/miniconda3/envs/ros2/include/sensor_msgs/sensor_msgs/msg"
+            ],
+            "defines": [
+                ""
+            ],
+            "macFrameworkPath": [
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+            ],
+            "compilerPath": "/Users/thanhduong/miniconda3/envs/ros2/bin/clang",
+            "cStandard": "${default}",
+            "cppStandard": "${default}",
+            "intelliSenseMode": "macos-clang-arm64"
+        }
+    ],
+    "version": 4
 }

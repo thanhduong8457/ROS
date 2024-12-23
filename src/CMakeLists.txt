@@ -59,10 +59,10 @@ rosidl_target_interfaces(main_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 # rosidl_target_interfaces(serial_module ${PROJECT_NAME} "rosidl_typesupport_cpp")
 # target_link_libraries(serial_module ${serial_LIBRARIES})
 
-add_executable(draw src/draw.cpp)
-ament_target_dependencies(draw rclcpp std_msgs sensor_msgs urdf geometry_msgs)
-target_link_libraries(draw delta_robot)
-rosidl_target_interfaces(draw ${PROJECT_NAME} "rosidl_typesupport_cpp")
+add_executable(draw_node src/draw_node.cpp)
+ament_target_dependencies(draw_node rclcpp std_msgs sensor_msgs urdf geometry_msgs)
+target_link_libraries(draw_node delta_robot)
+rosidl_target_interfaces(draw_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 # add_executable(test_acuracy src/test_acuracy.cpp)
 # ament_target_dependencies(test_acuracy rclcpp std_msgs sensor_msgs urdf geometry_msgs)
@@ -72,7 +72,7 @@ install(TARGETS
   main_node
   # node_a
   # node_b
-  draw
+  draw_node
   # test_acuracy
   DESTINATION lib/${PROJECT_NAME}
 )

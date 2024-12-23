@@ -2,7 +2,7 @@
     "cmake.sourceDirectory": "/home/thanhduong/ROS/src/delta_robot",
     "cmake.buildDirectory": "${workspaceFolder}/build",
     "cmake.configureArgs": [
-        // "-DPython3_FIND_VIRTUALENV=ONLY"
+        "-DPython3_FIND_VIRTUALENV=ONLY"
     ],
     "files.associations": {
         "__mutex_base": "cpp",
