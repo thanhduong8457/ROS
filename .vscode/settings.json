@@ -1,5 +1,6 @@
 {
-    "cmake.sourceDirectory": "/Users/thanhduong/Documents/Embeded_Project/ROS/src/delta_robot",
+    "cmake.sourceDirectory": "/home/thanhduong/ROS/src/delta_robot",
+    "cmake.buildDirectory": "${workspaceFolder}/build",
     "cmake.configureArgs": [
         // "-DPython3_FIND_VIRTUALENV=ONLY"
     ],
