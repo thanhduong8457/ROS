@@ -6,7 +6,6 @@
 #include "my_delta_robot/msg/num_point.hpp"
 #include "my_delta_robot/msg/vmax_amax.hpp"
 
-#include "delta_define.h"
 #include "delta_robot.h"
 
 class MyNode: public rclcpp::Node {
@@ -59,8 +58,7 @@ public:
 
         m_delta_robot = new delta_robot(); // construct a new delta_robot
         m_delta_robot->set_vmax_amax(1500, 200000); // set vmax and amax
-        m_delta_robot->num_point_1 = 120;
-        m_delta_robot->num_point_2 = 120;
+        m_delta_robot->set_resolution(120);
         // Create a thread to call main_func
         // std::thread(&MyNode::main_func, this).detach();
     }
@@ -91,13 +89,12 @@ private:
     /// @brief 
     /// @param msg 
     void set_num_point_callback(const my_delta_robot::msg::NumPoint::SharedPtr msg) {
-        if (msg->num_point_1 > 0 && msg->num_point_2 > 0) {
-            m_delta_robot->num_point_1 = msg->num_point_1;
-            m_delta_robot->num_point_2 = msg->num_point_2;
-            std::cout << "set num_point_1 = " << m_delta_robot->num_point_1 << " and num_point_2 = " << m_delta_robot->num_point_2 << std::endl;
+        if (msg->resolution > 0) {
+            m_delta_robot->set_resolution(msg->resolution);
+            std::cout << "set resolution = " << msg->resolution << std::endl;
         }
         else {
-            std::cout << "ERROR to set num_point" << std::endl;
+            std::cout << "ERROR to set resolution" << std::endl;
         }
     }
     

@@ -20,8 +20,7 @@ delta_robot::~delta_robot(void) {
 void delta_robot::initialize(void) {
     this->vmax = 1500;
     this->amax = 200000;
-    this->num_point_1 = 120;
-    this->num_point_2 = 120;
+    this->mResolution = 120;
     while (!m_data_delta.empty()) {
         delete m_data_delta.back();
         m_data_delta.pop_back();
@@ -213,8 +212,7 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
         vmax *= mmtm;
         amax *= mmtm;
 
-        if (num_point_1 <= 0) num_point_1 = 2;
-        if (num_point_2 <= 0) num_point_2 = 2;
+        if (mResolution <= 0) mResolution = 2;
 
         double tau = vmax / amax;
 
@@ -226,9 +224,9 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
             T = (q0 - this->dis) / vmax + tau;
         }
 
-        double paso1 = tau / num_point_1;
-        double paso2 = (T - (2 * tau)) / num_point_2;
-        int pas_total = num_point_1 + num_point_2 + num_point_1;
+        double paso1 = tau / mResolution;
+        double paso2 = (T - (2 * tau)) / mResolution;
+        int pas_total = mResolution + mResolution + mResolution;
 
         double Tf = 2 * (sqrt((this->dis - q0) / (amax)));
         double vmax_acel = amax * (Tf / 2);
@@ -237,10 +235,10 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
             vmax = vmax_acel;
             tau = Tf / 2;
             T = Tf;
-            paso1 = tau / num_point_1;
+            paso1 = tau / mResolution;
             paso2 = 0;
-            num_point_2 = 0;
-            pas_total = num_point_1 + num_point_2 + num_point_1;
+            mResolution = 0;
+            pas_total = mResolution + mResolution + mResolution;
         }
 
         for (int i = 0; i < pas_total; i++) {
@@ -258,13 +256,13 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
         double q_actual, v_actual, a_actual;
 
         for (int i = 0; i < pas_total; i++) {
-            if (i >= 0 && i < num_point_1) {
+            if (i >= 0 && i < mResolution) {
                 ti += paso1;
             }
-            else if (i >= num_point_1 && i < (num_point_1 + num_point_2)) {
+            else if (i >= mResolution && i < (mResolution + mResolution)) {
                 ti += paso2;
             }
-            else if (i >= (num_point_1 + num_point_2) && i < (pas_total)) {
+            else if (i >= (mResolution + mResolution) && i < (pas_total)) {
                 ti += paso1;
             }
             else {
@@ -474,6 +472,13 @@ void delta_robot::InverseAllJointStateExist(void) {
 void delta_robot::set_vmax_amax(unsigned int vmax, unsigned int amax) {
     this->vmax = vmax;
     this->amax = amax;
+}
+
+/// @brief 
+/// @param vmax 
+/// @param amax 
+void delta_robot::set_resolution(unsigned int resolution) {
+    this->mResolution = resolution;
 }
 
 /// @brief 

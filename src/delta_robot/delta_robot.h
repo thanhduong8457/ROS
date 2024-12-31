@@ -7,6 +7,7 @@ class delta_robot{
 private:
     double vmax;
     double amax;
+    unsigned int mResolution;
 
     double CalculateAngleYZ(Point);
     Point unit_vector(Point point0, Point pointf);
@@ -16,9 +17,6 @@ private:
     void system_linear_invese(double xprima, double(&xyz_res)[4]);
 
 public:
-    unsigned int num_point_1;
-    unsigned int num_point_2;
-
     double rot_z[3][3];
     double rot_y[3][3];
     double rot_tras[4][4];
@@ -46,5 +44,6 @@ public:
     void InverseAllJointStateExist(void);
 
     void set_vmax_amax(unsigned int vmax, unsigned int amax);
+    void set_resolution(unsigned int resolution);
 };
 #endif
