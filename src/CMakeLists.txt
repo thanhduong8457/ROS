@@ -64,10 +64,6 @@ ament_target_dependencies(draw_node rclcpp std_msgs sensor_msgs urdf geometry_ms
 target_link_libraries(draw_node delta_robot)
 rosidl_target_interfaces(draw_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-# add_executable(test_acuracy src/test_acuracy.cpp)
-# ament_target_dependencies(test_acuracy rclcpp std_msgs sensor_msgs urdf geometry_msgs)
-# rosidl_target_interfaces(test_acuracy ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
 install(TARGETS 
   main_node
   # node_a
@@ -75,6 +71,18 @@ install(TARGETS
   draw_node
   # test_acuracy
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY urdf
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY rviz
+  DESTINATION share/${PROJECT_NAME}
 )
 
 ament_package()

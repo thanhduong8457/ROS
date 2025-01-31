@@ -1,5 +1,5 @@
 {
-    "cmake.sourceDirectory": "/Users/thanhduong/Documents/Embeded_Project/ROS/src",
+    "cmake.sourceDirectory": "/Users/thanhduong/Documents/Embeded_Project/RobotOperatingSystem/ROS2/src",
     "cmake.configureArgs": [
         "-DPython3_FIND_VIRTUALENV=ONLY"
     ],
