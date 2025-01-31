@@ -59,8 +59,8 @@ public:
         m_delta_robot = new delta_robot(); // construct a new delta_robot
         m_delta_robot->set_vmax_amax(1500, 200000); // set vmax and amax
         m_delta_robot->set_resolution(120);
-        // Create a thread to call main_func
-        // std::thread(&MyNode::main_func, this).detach();
+
+        gripper = 0;
     }
 
     ~MyNode() {
@@ -115,8 +115,12 @@ private:
 
             for (unsigned int i = 1; i < m_delta_robot->m_data_delta.size(); i++) {
                 m_delta_robot->m_data_delta[i]->theta_val = m_delta_robot->inverse(m_delta_robot->m_data_delta[i]->position_val);
-                m_delta_robot->CreateJointStateList(m_delta_robot->m_data_delta[i]->position_val,m_delta_robot->m_data_delta[i]->theta_val,
-                    position_value);
+
+                m_delta_robot->CreateJointStateList(
+                    m_delta_robot->m_data_delta[i]->position_val,
+                    m_delta_robot->m_data_delta[i]->theta_val,
+                    position_value
+                );
 
                 delta = m_delta_robot->m_data_delta[i]->time_point * 10 - m_delta_robot->m_data_delta[i - 1]->time_point * 10; // bug index out range
 
