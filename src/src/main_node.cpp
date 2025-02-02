@@ -116,7 +116,7 @@ private:
             for (unsigned int i = 1; i < m_delta_robot->m_data_delta.size(); i++) {
                 m_delta_robot->m_data_delta[i]->theta_val = m_delta_robot->inverse(m_delta_robot->m_data_delta[i]->position_val);
 
-                m_delta_robot->CreateJointStateList(
+                m_delta_robot->create_joint_state_list(
                     m_delta_robot->m_data_delta[i]->position_val,
                     m_delta_robot->m_data_delta[i]->theta_val,
                     position_value

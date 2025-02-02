@@ -38,25 +38,30 @@ void rotation240(double ent[3], double(&sal)[3]) {
 /// @param eee 
 /// @param brazo 
 /// @param sal 
-void punto_ee(double eee[3], int brazo, double (&sal)[3]) {
+void punto_ee(int brazo, double eee[3], double (&sal)[3]) {
+    double vhe1[3] = { 0, 0, 0 };
     double vhe2[3] = { (he * mmtm) / 3, 0.0, 0.0 };
     double vhe3[3] = { 0, 0, 0 };
-    double vhe1[3] = { 0, 0, 0 };
 
     rotation120(vhe2, vhe3);
     rotation120(vhe3, vhe1);
 
-    if (brazo == 2) sumav(eee, vhe2, sal);
-    else if (brazo == 3) sumav(eee, vhe3, sal);
-    else if (brazo == 1) sumav(eee, vhe1, sal);
-
+    if (brazo == 2) {
+        sum_vector(eee, vhe2, sal);
+    }
+    else if (brazo == 3) {
+        sum_vector(eee, vhe3, sal);
+    }
+    else if (brazo == 1) {
+        sum_vector(eee, vhe1, sal);
+    }
 }
 
 /// @brief 
 /// @param v1 
 /// @param v2 
 /// @param s 
-void sumav(double v1[3], double v2[3], double (&s)[3]) {
+void sum_vector(double v1[3], double v2[3], double (&s)[3]) {
     s[0] = v1[0] + v2[0];
     s[1] = v1[1] + v2[1];
     s[2] = v1[2] + v2[2];
@@ -68,7 +73,7 @@ void sumav(double v1[3], double v2[3], double (&s)[3]) {
 /// @param brazo 
 /// @param ang_a 
 /// @param ang_b 
-void angulos_codo(double codo[3], double eee[3], int brazo, double &ang_a, double &ang_b) {
+void angulos_codo(int brazo, double codo[3], double eee[3], double &ang_a, double &ang_b) {
     double _codo[3] = {};
     double _eee[3] = {};
     if (brazo == 3) {
@@ -106,7 +111,9 @@ void angulos_codo(double codo[3], double eee[3], int brazo, double &ang_a, doubl
             ang_a = ang_a + (180 * dtr);
         }
     }
-    else ang_b = 0;
+    else { 
+        ang_b = 1.570796326794897;
+    }
 }
 
 /// @brief rotation_y

@@ -11,6 +11,10 @@ Panels:
         - /RobotModel1/Status1
         - /RobotModel1/Mass Properties1
         - /RobotModel1/Description Topic1
+        - /TF1
+        - /TF1/Status1
+        - /TF1/Frames1
+        - /TF1/Tree1
       Splitter Ratio: 0.577903687953949
     Tree Height: 625
   - Class: rviz_common/Selection
@@ -142,6 +146,65 @@ Visualization Manager:
       Update Interval: 0
       Value: true
       Visual Enabled: true
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+        actuador:
+          Value: true
+        aux1:
+          Value: true
+        aux2:
+          Value: true
+        barra1_a:
+          Value: true
+        barra1_b:
+          Value: true
+        barra2_a:
+          Value: true
+        barra2_b:
+          Value: true
+        barra3_a:
+          Value: true
+        barra3_b:
+          Value: true
+        base_link:
+          Value: true
+        brazo1:
+          Value: true
+        brazo2:
+          Value: true
+        brazo3:
+          Value: true
+        grip:
+          Value: true
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: false
+      Tree:
+        base_link:
+          aux1:
+            aux2:
+              actuador:
+                grip:
+                  {}
+          brazo1:
+            barra1_a:
+              barra1_b:
+                {}
+          brazo2:
+            barra2_a:
+              barra2_b:
+                {}
+          brazo3:
+            barra3_a:
+              barra3_b:
+                {}
+      Update Interval: 0
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -188,7 +251,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 0.9676908850669861
+      Distance: 2.5322208404541016
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -203,10 +266,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5302029848098755
+      Pitch: 0.34020310640335083
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 3.4585914611816406
+      Yaw: 4.9785990715026855
     Saved: ~
 Window Geometry:
   Displays:
