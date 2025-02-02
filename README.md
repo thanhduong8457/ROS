@@ -184,3 +184,5 @@ ros2 topic pub --once /set_vmax_amax my_delta_robot/msg/VmaxAmax "{vmax: 10.0, a
 
 # Another way to build project, 
 cmake ../src/ -DPython3_FIND_VIRTUALENV=ONLY
+
+ros2 launch my_delta_robot display.launch.py

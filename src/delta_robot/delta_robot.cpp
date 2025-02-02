@@ -274,7 +274,7 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
             m_data_delta[i]->vel = v_actual;
             m_data_delta[i]->acel = a_actual;
             m_data_delta[i]->time_point = ti;
-            cout << "dis=" << q_actual << ", v=" << v_actual << ", a_actual=" << a_actual << ", time_point=" << ti << endl;
+            // cout << "dis=" << q_actual << ", v=" << v_actual << ", a_actual=" << a_actual << ", time_point=" << ti << endl;
         }
     }
     catch(const std::exception& e) {
@@ -355,7 +355,7 @@ void delta_robot::system_linear_matrix(void) {
         m_data_delta[i]->position_val.x = xyz_res[0];
         m_data_delta[i]->position_val.y = xyz_res[1];
         m_data_delta[i]->position_val.z = xyz_res[2];
-        cout << "x=" << xyz_res[0] << ", y=" << xyz_res[1] << ", z=" << xyz_res[2] << endl;
+        // cout << "x=" << xyz_res[0] << ", y=" << xyz_res[1] << ", z=" << xyz_res[2] << endl;
         
         // // ######  velocidad xyz  ########## 未来用
         // system_linear_invese(m_data_delta[i]->vel, rot_z, rot_y, theta_y, theta_z, rot_tras, xyz_res);
@@ -501,8 +501,8 @@ Theta delta_robot::inverse(Point point) {
     point_temp.z = point.z;
     theta.angle1 = angle_yz(point_temp); // rotate to -120 deg
 
-    cout << "Point=(" << point_temp.x << ", " << point_temp.y << ", " << point_temp.z ;
-    cout << ") -> Thetal=(" << theta.angle1 << ", " << theta.angle2 << ", " << theta.angle3 << ")" << endl;
+    // cout << "Point=(" << point_temp.x << ", " << point_temp.y << ", " << point_temp.z ;
+    // cout << ") -> Thetal=(" << theta.angle1 << ", " << theta.angle2 << ", " << theta.angle3 << ")" << endl;
     
     return theta;
 }
@@ -619,4 +619,9 @@ void delta_robot::create_joint_state_list(
     position[10] = pointi.y;
     position[11] = pointi.z;
     // position[12] = gripper;
+
+    // cout << "position[0]=" << position[0] << ", position[1]=" << position[1] << ", position[2]=" << position[2] << endl;
+    // cout << "position[3]=" << position[3] << ", position[4]=" << position[4] << ", position[5]=" << position[5] << endl;
+    // cout << "position[6]=" << position[6] << ", position[7]=" << position[7] << ", position[8]=" << position[8] << endl;
+    // cout << "position[9]=" << position[9] << ", position[10]=" << position[10] << ", position[11]=" << position[11] << endl << endl;
 }
