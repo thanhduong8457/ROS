@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
@@ -44,8 +45,9 @@ def generate_launch_description():
         # Initial Pose Publisher
         Node(
             package='my_delta_robot',
-            executable='initial_pose_publisher',
-            name='initial_pose_publisher'
+            executable='initial_pose_publisher.py',
+            name='initial_pose_publisher',
+            output='screen'
         ),
         # draw_node
         Node(

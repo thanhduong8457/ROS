@@ -1,4 +1,4 @@
-# Save as `initial_pose_publisher.py`
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
@@ -7,7 +7,7 @@ class InitialPosePublisher(Node):
     def __init__(self):
         super().__init__('initial_pose_publisher')
         self.publisher = self.create_publisher(JointState, 'joint_states', 10)
-        self.timer = self.create_timer(1.0, self.publish_initial_pose)  # Publish once
+        self.timer = self.create_timer(0.2, self.publish_initial_pose)  # Publish once
 
     def publish_initial_pose(self):
         self.get_logger().info("publish_initial_pose")
@@ -51,7 +51,7 @@ class InitialPosePublisher(Node):
 def main():
     rclpy.init()
     node = InitialPosePublisher()
-    rclpy.spin(node)
+    rclpy.spin_once(node)
     rclpy.shutdown()
 
 if __name__ == '__main__':

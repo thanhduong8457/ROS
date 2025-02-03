@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 project(my_delta_robot)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 # Add the directory containing Findserial.cmake to CMAKE_MODULE_PATH
@@ -12,6 +12,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DPython3_FIND_VIRTUALENV=ONLY")
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(urdf REQUIRED)
@@ -24,19 +25,19 @@ include_directories(${Python3_NumPy_INCLUDE_DIRS})
 # include_directories(${serial_INCLUDE_DIRS})
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/Angulo.msg"
-  "msg/LinearSpeedXYZ.msg"
-  "msg/Posicionxyz.msg"
-  "msg/PositionArm.msg"
-  "msg/ImagePos.msg"
-  "msg/VmaxAmax.msg"
-  "msg/NumPoint.msg"
-  DEPENDENCIES geometry_msgs
+    "msg/Angulo.msg"
+    "msg/LinearSpeedXYZ.msg"
+    "msg/Posicionxyz.msg"
+    "msg/PositionArm.msg"
+    "msg/ImagePos.msg"
+    "msg/VmaxAmax.msg"
+    "msg/NumPoint.msg"
+    DEPENDENCIES geometry_msgs
 )
 
 include_directories(
-  delta_robot 
-  ${ament_INCLUDE_DIRS}
+    delta_robot
+    ${ament_INCLUDE_DIRS}
 )
 
 add_subdirectory(delta_robot)
@@ -65,28 +66,30 @@ target_link_libraries(draw_node delta_robot)
 rosidl_target_interfaces(draw_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 install(TARGETS 
-  main_node
-  # node_a
-  # node_b
-  draw_node
-  # test_acuracy
-  DESTINATION lib/${PROJECT_NAME}
+    main_node
+    # node_a
+    # node_b
+    draw_node
+    # test_acuracy
+    DESTINATION lib/${PROJECT_NAME}
 )
 
-install(DIRECTORY python_script
-  DESTINATION lib/${PROJECT_NAME}
+# Install Python scripts
+install(PROGRAMS
+    python_scripts/initial_pose_publisher.py
+    DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}
+    DESTINATION share/${PROJECT_NAME}
 )
 
 install(DIRECTORY urdf
-  DESTINATION share/${PROJECT_NAME}
+    DESTINATION share/${PROJECT_NAME}
 )
 
 install(DIRECTORY rviz
-  DESTINATION share/${PROJECT_NAME}
+    DESTINATION share/${PROJECT_NAME}
 )
 
 ament_package()
