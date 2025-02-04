@@ -8,7 +8,7 @@ set(LIBRARY_INCLUDES
     "./"
 )
 
-add_library(${LIBRARY_NAME} STATIC
+add_library(${LIBRARY_NAME} SHARED
     ${LIBRARY_SOURCES}
 )
 

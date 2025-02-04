@@ -88,10 +88,12 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    if (ser.isOpen())
+    if (ser.isOpen()) {
         RCLCPP_INFO(node->get_logger(), "Serial Port initialized");
-    else
+    }
+    else {
         return -1;
+    }
 
     rclcpp::Rate loop_rate(50);
 

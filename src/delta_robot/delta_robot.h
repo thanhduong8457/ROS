@@ -7,18 +7,16 @@ class delta_robot{
 private:
     double vmax;
     double amax;
+    unsigned int mResolution;
 
-    double CalculateAngleYZ(Point);
+    // double CalculateAngleYZ(Point);
     Point unit_vector(Point point0, Point pointf);
     void angle_rotation(Point unit_vector);
-    double delta_calcAngleYZ(double x0, double y0, double z0);
+    // double delta_calcAngleYZ(double x0, double y0, double z0);
     double angle_yz(Point point0);
     void system_linear_invese(double xprima, double(&xyz_res)[4]);
 
 public:
-    unsigned int num_point_1;
-    unsigned int num_point_2;
-
     double rot_z[3][3];
     double rot_y[3][3];
     double rot_tras[4][4];
@@ -42,9 +40,10 @@ public:
 
     void system_linear(void);
     void system_linear_matrix(void);
-    void CreateJointStateList(Point point, Theta theta, double(&position)[13]);
-    void InverseAllJointStateExist(void);
+    void create_joint_state_list(Point point, Theta theta, double(&position)[13]);
+    void inverse_all_joint_state_exist(void);
 
     void set_vmax_amax(unsigned int vmax, unsigned int amax);
+    void set_resolution(unsigned int resolution);
 };
 #endif

@@ -1,32 +1,20 @@
-##%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS2
-#=== link include with ROS.jgp picture above ===#
+# Step by step to create the project from scratch
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS2
+# === link include with ROS.jgp picture above ===#
 	https://docs.ros.org/en/galactic/index.html
 	https://roboticsbackend.com/category/ros2/
 
-#list of robot pakages: 
+# list of robot pakages: 
 	https://moveit.ros.org/robots/
 
-#link of book:
-	https://vn1lib.org/s/ROS 
-	
-# link yootube about moveit
+# link youtube about moveit
 	https://www.youtube.com/channel/UCofPudSKrNzT3vccJD6VDyA/videos
 
-#ROS melodic:
-	http://wiki.ros.org/ROS/Tutorials
-#Tutorials:
-	http://wiki.ros.org/ROS/Tutorials/InstallingandConfiguringROSEnvironment
-#moveit:
-	http://docs.ros.org/en/melodic/api/moveit_tutorials/html/doc/quickstart_in_rviz/quickstart_in_rviz_tutorial.html
-
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 https://www.udemy.com/course/mastering-rtos-hands-on-with-freertos-arduino-and-stm32fx/learn/lecture/25694576#overview 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 DRV8825 x3
 NEMA 23 Stepper Motor
-
-
 
 # Udemy guide ROS2: 
 https://banvien.udemy.com/course/ros2-for-beginners/learn/lecture/21305600#overview
@@ -35,7 +23,7 @@ https://banvien.udemy.com/course/ros2-for-beginners/learn/lecture/21305600#overv
 https://docs.ros.org/en/humble/index.html
 
 # command create package: 
-ros2 pkg create NAME_OF_PAKAGE --build-type ament_python/ament_cmake --dependencies /rclcpp
+ros2 pkg create NAME_OF_PAKAGE --build-type ament_python/ament_cmake --dependencies rclcpp
 ros2 pkg create urdf_tutorial --build-type ament_cmake --dependencies rclcpp
 
 ros2 pkg create beginner_tutorials --build-type ament_cmake --dependencies rclcpp
@@ -43,9 +31,8 @@ ros2 pkg create delta_robot --build-type ament_cmake --dependencies rclcpp
 
 ros2 pkg create --build-type ament_cmake --license Apache-2.0 delta_robot
 
-
 # build specific package with command: 
-colcon build --packages-select NAME_OF_PAKAGE
+# colcon build --packages-select NAME_OF_PAKAGE
 colcon build --packages-select my_cpp_pkg
 colcon build --packages-select my_py_pkg
 colcon build --packages-select urdf_tutorial
@@ -57,9 +44,9 @@ colcon build --symlink-install \
   -DPython3_FIND_STRATEGY=LOCATION -DPython3_FIND_UNVERSIONED_NAMES=FIRST
 
 # when we use the vitual env for build the package, the specify in percific python is required for building the package
-colcon build --symlink-install --cmake-args -DPython3_FIND_VIRTUALENV=ONLY --packages-select delta_robot
+colcon build --symlink-install --cmake-args -DPython3_FIND_VIRTUALENV=ONLY --packages-select my_delta_robot
 
-colcon build --symlink-install --packages-select delta_robot
+colcon build --symlink-install --packages-select my_delta_robot
 
 beginner_tutorials
 delta_robot
@@ -72,7 +59,6 @@ pip3 install setuptools==58.2.0 (setuptools is the name of the tool)
 
 # Switch the env to ros2 by command: 
 conda activate ros2
-
 source the file .zsh in folder install after build to run the ros2 command
 
 path to ROS2: /Users/thanhduong/miniconda3/envs/ros2/include
@@ -85,9 +71,6 @@ ros2 run rqt_gui rqt_gui --standalone rqt_graph.ros_graph.RosGraph
 # IMPORTANCE!!!
 # if you want to debug it then you need to change then base -> ros2 environment before open the vscode
 
-
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
-http://docs.ros.org/en/melodic/api/moveit_tutorials/html/doc/move_group_interface/move_group_interface_tutorial.html
 # spider robot
 https://hackaday.io/project/180534-zerobug-diy-hexapod-robot
 
@@ -105,7 +88,6 @@ https://www.youtube.com/watch?v=OSL-zqw4cXs
 https://www.youtube.com/watch?v=IS3JIV45rh0
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
-
 # Design Delta robot on solidwork
 https://www.youtube.com/watch?v=xt7HtHjXo4s
 
@@ -119,15 +101,16 @@ roslaunch panda_moveit_config demo.launch rviz_tutorial:=true
 
 roslaunch moveit_setup_assistant setup_assistant.launch
 	rosdep check rqt_graph
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
 # check URDF file
 	check_urdf delta_robot.urdf
 	urdf_to_graphiz delta_robot.urdf
 	evince Delta_robot.pdf
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
 # [shell 1]: ROS Master
 conda activate ros2
 
@@ -158,9 +141,9 @@ rostopic pub -1 /input_ls_final delta_robot/linear_speed_xyz -- 0.0 -150.0 -490.
 
 rostopic pub -1 /status_to_image_node std_msgs/String -- "Done"
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
 
 # set position of current point of robot delta
 rostopic pub -1 /set_current_point delta_robot/Posicionxyz -- 0.0 0.0 -375 -1
@@ -198,6 +181,8 @@ rostopic pub -1 /set_num_point delta_robot/num_point -- 120 200
 rostopic pub -1 /set_vmax_amax delta_robot/vmax_amax -- 1500.0 200000.0
 ros2 topic pub --once /set_vmax_amax my_delta_robot/msg/VmaxAmax "{vmax: 1500.0, amax: 200000.0}"
 ros2 topic pub --once /set_vmax_amax my_delta_robot/msg/VmaxAmax "{vmax: 10.0, amax: 200.0}"
-# another way to build project, 
 
-cmake ../src/delta_robot/ -DPython3_FIND_VIRTUALENV=ONLY
+# Another way to build project, 
+cmake ../src/ -DPython3_FIND_VIRTUALENV=ONLY
+
+ros2 launch my_delta_robot display.launch.py

@@ -20,8 +20,7 @@ delta_robot::~delta_robot(void) {
 void delta_robot::initialize(void) {
     this->vmax = 1500;
     this->amax = 200000;
-    this->num_point_1 = 120;
-    this->num_point_2 = 120;
+    this->mResolution = 120;
     while (!m_data_delta.empty()) {
         delete m_data_delta.back();
         m_data_delta.pop_back();
@@ -34,15 +33,15 @@ void delta_robot::initialize(void) {
 /// @return 
 Point delta_robot::unit_vector(Point point0, Point pointf) {
     Point return_point;
-    double delta_x = pointf.x - point0.x;
-    double delta_y = pointf.y - point0.y;
-    double delta_z = pointf.z - point0.z;
+    double denta_x = pointf.x - point0.x;
+    double denta_y = pointf.y - point0.y;
+    double denta_z = pointf.z - point0.z;
 
-    double modulo = sqrt(delta_x * delta_x + delta_y * delta_y + delta_z * delta_z);
+    double modulo = sqrt(denta_x * denta_x + denta_y * denta_y + denta_z * denta_z);
 
-    return_point.x = delta_x / modulo;
-    return_point.y = delta_y / modulo;
-    return_point.z = delta_z / modulo;
+    return_point.x = denta_x / modulo;
+    return_point.y = denta_y / modulo;
+    return_point.z = denta_z / modulo;
     return return_point;
 }
 
@@ -180,28 +179,28 @@ void delta_robot::angle_rotation(Point unit_vector) {
     }
 }
 
-/// @brief 
-/// @param x0 
-/// @param y0 
-/// @param z0 
-/// @return 
-double delta_robot::delta_calcAngleYZ(double x0, double y0, double z0) {
-    double y1 = -0.5 * 0.57735 * ff; // f/2 * tg 30
-    y0 -= 0.5 * 0.57735 * ee;        // shift center to edge
-                                     // z = a + b*y
-    double a = (x0 * x0 + y0 * y0 + z0 * z0 + rf * rf - re * re - y1 * y1) / (2 * z0);
-    double b = (y1 - y0) / z0;
+// /// @brief 
+// /// @param x0 
+// /// @param y0 
+// /// @param z0 
+// /// @return 
+// double delta_robot::delta_calcAngleYZ(double x0, double y0, double z0) {
+//     double y1 = -0.5 * 0.57735 * ff; // f/2 * tg 30
+//     y0 -= 0.5 * 0.57735 * ee;        // shift center to edge
+//                                      // z = a + b*y
+//     double a = (x0 * x0 + y0 * y0 + z0 * z0 + rf * rf - re * re - y1 * y1) / (2 * z0);
+//     double b = (y1 - y0) / z0;
 
-    // discriminant
-    double d = -(a + b * y1) * (a + b * y1) + rf * (b * b * rf + rf);
-    if (d < 0) {
-        return -1; // non-existing point
-    }
-    double yj = (y1 - a * b - sqrt(d)) / (b * b + 1); // choosing outer point
-    double zj = a + b * yj;
-    double theta = 180.0 * atan(-zj / (y1 - yj)) / pi + ((yj > y1) ? 180.0 : 0.0);
-    return theta;
-}
+//     // discriminant
+//     double d = -(a + b * y1) * (a + b * y1) + rf * (b * b * rf + rf);
+//     if (d < 0) {
+//         return -1; // non-existing point
+//     }
+//     double yj = (y1 - a * b - sqrt(d)) / (b * b + 1); // choosing outer point
+//     double zj = a + b * yj;
+//     double theta = 180.0 * atan(-zj / (y1 - yj)) / pi + ((yj > y1) ? 180.0 : 0.0);
+//     return theta;
+// }
 
 /// @brief 
 /// @param  
@@ -213,8 +212,7 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
         vmax *= mmtm;
         amax *= mmtm;
 
-        if (num_point_1 <= 0) num_point_1 = 2;
-        if (num_point_2 <= 0) num_point_2 = 2;
+        if (mResolution <= 0) mResolution = 2;
 
         double tau = vmax / amax;
 
@@ -226,9 +224,9 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
             T = (q0 - this->dis) / vmax + tau;
         }
 
-        double paso1 = tau / num_point_1;
-        double paso2 = (T - (2 * tau)) / num_point_2;
-        int pas_total = num_point_1 + num_point_2 + num_point_1;
+        double paso1 = tau / mResolution;
+        double paso2 = (T - (2 * tau)) / mResolution;
+        int pas_total = mResolution + mResolution + mResolution;
 
         double Tf = 2 * (sqrt((this->dis - q0) / (amax)));
         double vmax_acel = amax * (Tf / 2);
@@ -237,10 +235,10 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
             vmax = vmax_acel;
             tau = Tf / 2;
             T = Tf;
-            paso1 = tau / num_point_1;
+            paso1 = tau / mResolution;
             paso2 = 0;
-            num_point_2 = 0;
-            pas_total = num_point_1 + num_point_2 + num_point_1;
+            mResolution = 0;
+            pas_total = mResolution + mResolution + mResolution;
         }
 
         for (int i = 0; i < pas_total; i++) {
@@ -258,13 +256,13 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
         double q_actual, v_actual, a_actual;
 
         for (int i = 0; i < pas_total; i++) {
-            if (i >= 0 && i < num_point_1) {
+            if (i >= 0 && i < mResolution) {
                 ti += paso1;
             }
-            else if (i >= num_point_1 && i < (num_point_1 + num_point_2)) {
+            else if (i >= mResolution && i < (mResolution + mResolution)) {
                 ti += paso2;
             }
-            else if (i >= (num_point_1 + num_point_2) && i < (pas_total)) {
+            else if (i >= (mResolution + mResolution) && i < (pas_total)) {
                 ti += paso1;
             }
             else {
@@ -276,7 +274,7 @@ void delta_robot::TrapezoidalVelocityProfile(void) {
             m_data_delta[i]->vel = v_actual;
             m_data_delta[i]->acel = a_actual;
             m_data_delta[i]->time_point = ti;
-            cout << "dis=" << q_actual << ", v=" << v_actual << ", a_actual=" << a_actual << ", time_point=" << ti << endl;
+            // cout << "dis=" << q_actual << ", v=" << v_actual << ", a_actual=" << a_actual << ", time_point=" << ti << endl;
         }
     }
     catch(const std::exception& e) {
@@ -357,15 +355,15 @@ void delta_robot::system_linear_matrix(void) {
         m_data_delta[i]->position_val.x = xyz_res[0];
         m_data_delta[i]->position_val.y = xyz_res[1];
         m_data_delta[i]->position_val.z = xyz_res[2];
-        cout << "x=" << xyz_res[0] << ", y=" << xyz_res[1] << ", z=" << xyz_res[2] << endl;
+        // cout << "x=" << xyz_res[0] << ", y=" << xyz_res[1] << ", z=" << xyz_res[2] << endl;
         
-        // // ######  velocidad xyz  ########## 来
+        // // ######  velocidad xyz  ########## 未来用
         // system_linear_invese(m_data_delta[i]->vel, rot_z, rot_y, theta_y, theta_z, rot_tras, xyz_res);
         // m_data_delta[i]->vel_x = xyz_res[0][0];
         // m_data_delta[i]->vel_y = xyz_res[1][0];
         // m_data_delta[i]->vel_z = xyz_res[2][0];
 
-        // // ######  aceleracion xyz  ##########
+        // // ######  aceleracion xyz  ########## 未来用
         // system_linear_invese(m_data_delta[i]->acel, rot_z, rot_y, theta_y, theta_z, rot_tras, xyz_res);
         // m_data_delta[i]->acel_x = xyz_res[0][0];
         // m_data_delta[i]->acel_y = xyz_res[1][0];
@@ -439,30 +437,30 @@ void delta_robot::system_linear_invese(double xprima, double (&xyz_res)[4]) {
     }
 }
 
-/// @brief 
-/// @param mStartPoint 
-/// @return 
-double delta_robot::CalculateAngleYZ(Point mStartPoint) {
-    double y1 = -0.5 * 0.57735 * ff; // f/2 * tg 30
-    mStartPoint.y -= 0.5 * 0.57735 * ee;        // shift center to edge
-                                     // z = a + b*y
-    double a = (mStartPoint.x * mStartPoint.x + mStartPoint.y * mStartPoint.y + mStartPoint.z * mStartPoint.z + rf * rf - re * re - y1 * y1) / (2 * mStartPoint.z);
-    double b = (y1 - mStartPoint.y) / mStartPoint.z;
+// /// @brief 
+// /// @param mStartPoint 
+// /// @return 
+// double delta_robot::CalculateAngleYZ(Point mStartPoint) {
+//     double y1 = -0.5 * 0.57735 * ff; // f/2 * tg 30
+//     mStartPoint.y -= 0.5 * 0.57735 * ee; // shift center to edge
+//                                      // z = a + b*y
+//     double a = (mStartPoint.x * mStartPoint.x + mStartPoint.y * mStartPoint.y + mStartPoint.z * mStartPoint.z + rf * rf - re * re - y1 * y1) / (2 * mStartPoint.z);
+//     double b = (y1 - mStartPoint.y) / mStartPoint.z;
 
-    // discriminant
-    double d = -(a + b * y1) * (a + b * y1) + rf * (b * b * rf + rf);
-    if (d < 0) {
-        return 0; // non-existing point
-    }
-    double yj = (y1 - a * b - sqrt(d)) / (b * b + 1); // choosing outer point
-    double zj = a + b * yj;
-    double theta = 180.0 * atan(-zj / (y1 - yj)) / pi + ((yj > y1) ? 180.0 : 0.0);
-    return theta;
-}
+//     // discriminant
+//     double d = -(a + b * y1) * (a + b * y1) + rf * (b * b * rf + rf);
+//     if (d < 0) {
+//         return 0; // non-existing point
+//     }
+//     double yj = (y1 - a * b - sqrt(d)) / (b * b + 1); // choosing outer point
+//     double zj = a + b * yj;
+//     double theta = 180.0 * atan(-zj / (y1 - yj)) / pi + ((yj > y1) ? 180.0 : 0.0);
+//     return theta;
+// }
 
 /// @brief 
 /// @param  
-void delta_robot::InverseAllJointStateExist(void) {
+void delta_robot::inverse_all_joint_state_exist(void) {
     for (int i = 0; i < m_data_delta.size(); i++) {
         m_data_delta[i]->theta_val = inverse(m_data_delta[i]->position_val);
     }
@@ -474,6 +472,13 @@ void delta_robot::InverseAllJointStateExist(void) {
 void delta_robot::set_vmax_amax(unsigned int vmax, unsigned int amax) {
     this->vmax = vmax;
     this->amax = amax;
+}
+
+/// @brief 
+/// @param vmax 
+/// @param amax 
+void delta_robot::set_resolution(unsigned int resolution) {
+    this->mResolution = resolution;
 }
 
 /// @brief 
@@ -496,8 +501,8 @@ Theta delta_robot::inverse(Point point) {
     point_temp.z = point.z;
     theta.angle1 = angle_yz(point_temp); // rotate to -120 deg
 
-    cout << "Point=(" << point_temp.x << ", " << point_temp.y << ", " << point_temp.z ;
-    cout << ") -> Thetal=(" << theta.angle1 << ", " << theta.angle2 << ", " << theta.angle3 << ")" << endl;
+    // cout << "Point=(" << point_temp.x << ", " << point_temp.y << ", " << point_temp.z ;
+    // cout << ") -> Thetal=(" << theta.angle1 << ", " << theta.angle2 << ", " << theta.angle3 << ")" << endl;
     
     return theta;
 }
@@ -563,7 +568,7 @@ double delta_robot::angle_yz(Point point) {
 /// @param theta 
 /// @param gripper 
 /// @param position 
-void delta_robot::CreateJointStateList(
+void delta_robot::create_joint_state_list(
     Point pointi,
     Theta theta,
     double (&position)[13]
@@ -571,39 +576,40 @@ void delta_robot::CreateJointStateList(
     // Rviz interior angles in Radians
     double punto[3] = {-pointi.y, -pointi.x, -pointi.z};
 
-    double c2[3] = {};
-    double p2[3] = {};
+    double a1_a = 0;
+    double a2_a = 0;
+    double a3_a = 0;
+    double a1_b = 0;
+    double a2_b = 0;
+    double a3_b = 0;
+
+    double temp[3] = {0,0,0};
+    double c1[3] = {0,0,0};
+    double p1[3] = {0,0,0};
+    double c2[3] = {0,0,0};
+    double p2[3] = {0,0,0};
+    double c3[3] = {0,0,0};
+    double p3[3] = {0,0,0};
+
+    punto_codo(theta.angle1, temp);
+    rotation240(temp, c1);
+    punto_ee(1, punto, p1);
+    angulos_codo(1, c1, p1, a1_a, a1_b);
+
     punto_codo(theta.angle2, c2);
-    punto_ee(punto, 2, p2);
+    punto_ee(2, punto, p2);
+    angulos_codo(2, c2, p2, a2_a, a2_b);
 
-    double a2_a, a2_b;
-    angulos_codo(c2, p2, 2, a2_a, a2_b);
-
-    double c3[3] = {};
-    double temp[3] = {};
-    double p3[3] = {};
     punto_codo(theta.angle3, temp);
     rotation120(temp, c3);
-    punto_ee(punto, 3, p3);
-
-    double a3_a, a3_b;
-    angulos_codo(c3, p3, 3, a3_a, a3_b);
-
-    double c1[3] = {};
-    double p1[3] = {};
-    punto_codo(theta.angle1, c1);
-    rotation120(c1, temp);
-    rotation120(temp, c1);
-    punto_ee(punto, 1, p1);
-
-    double a1_a, a1_b;
-    angulos_codo(c1, p1, 1, a1_a, a1_b);
+    punto_ee(3, punto, p3);
+    angulos_codo(3, c3, p3, a3_a, a3_b);
 
     // Data to publish in Rviz
     position[0]  = theta.angle1 * dtr;
     position[1]  = theta.angle2 * dtr;
     position[2]  = theta.angle3 * dtr;
-    position[3]  = theta.angle1 + a1_a;
+    position[3]  = theta.angle1 * dtr + a1_a;
     position[4]  = a1_b;
     position[5]  = theta.angle2 * dtr + a2_a;
     position[6]  = a2_b;
@@ -613,4 +619,9 @@ void delta_robot::CreateJointStateList(
     position[10] = pointi.y;
     position[11] = pointi.z;
     // position[12] = gripper;
+
+    // cout << "position[0]=" << position[0] << ", position[1]=" << position[1] << ", position[2]=" << position[2] << endl;
+    // cout << "position[3]=" << position[3] << ", position[4]=" << position[4] << ", position[5]=" << position[5] << endl;
+    // cout << "position[6]=" << position[6] << ", position[7]=" << position[7] << ", position[8]=" << position[8] << endl;
+    // cout << "position[9]=" << position[9] << ", position[10]=" << position[10] << ", position[11]=" << position[11] << endl << endl;
 }
