@@ -1,4 +1,29 @@
-# Step by step to create the project from scratch
+# my_delta_robot — ROS2 Delta Robot
+
+Delta parallel robot package: inverse kinematics, trapezoidal velocity profiles, RViz visualization.
+
+---
+
+## Build & Run
+
+From the workspace root (parent of `src/`):
+
+```bash
+# Build
+colcon build --symlink-install --packages-select my_delta_robot
+# With conda/virtualenv Python:
+colcon build --symlink-install --cmake-args -DPython3_FIND_VIRTUALENV=ONLY --packages-select my_delta_robot
+
+# Source and launch (RViz + robot_state_publisher + draw_node + main_node)
+source install/setup.bash
+ros2 launch my_delta_robot display.launch.py
+```
+
+**Active nodes** (included in `display.launch.py`): `robot_state_publisher`, `rviz2`, `draw_node`, `main_node`. Optional/legacy: `node_a`, `node_b`, `serial_module` (commented out in CMakeLists; enable if needed).
+
+---
+
+## Step by step to create the project from scratch
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%# ROS2
 # === link include with ROS.jgp picture above ===#
 	https://docs.ros.org/en/galactic/index.html
@@ -27,9 +52,9 @@ ros2 pkg create NAME_OF_PAKAGE --build-type ament_python/ament_cmake --dependenc
 ros2 pkg create urdf_tutorial --build-type ament_cmake --dependencies rclcpp
 
 ros2 pkg create beginner_tutorials --build-type ament_cmake --dependencies rclcpp
-ros2 pkg create delta_robot --build-type ament_cmake --dependencies rclcpp
+ros2 pkg create my_delta_robot --build-type ament_cmake --dependencies rclcpp
 
-ros2 pkg create --build-type ament_cmake --license Apache-2.0 delta_robot
+ros2 pkg create --build-type ament_cmake --license Apache-2.0 my_delta_robot
 
 # build specific package with command: 
 # colcon build --packages-select NAME_OF_PAKAGE
@@ -37,7 +62,7 @@ colcon build --packages-select my_cpp_pkg
 colcon build --packages-select my_py_pkg
 colcon build --packages-select urdf_tutorial
 
-colcon build --packages-select delta_robot
+colcon build --packages-select my_delta_robot
 
 colcon build --symlink-install \
   -DPython3_EXECUTABLE:INTERNAL=$CONDA_PREFIX/bin/python3 \
@@ -104,85 +129,44 @@ roslaunch moveit_setup_assistant setup_assistant.launch
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
 # check URDF file
-	check_urdf delta_robot.urdf
-	urdf_to_graphiz delta_robot.urdf
+	check_urdf my_delta_robot.urdf
+	urdf_to_graphiz my_delta_robot.urdf
 	evince Delta_robot.pdf
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
-# [shell 1]: ROS Master
+# [shell 1]: Activate ROS2 env
 conda activate ros2
+source install/setup.bash
 
-# [shell 2]: Run Rviz
-roslaunch delta_robot my_delta.launch
+# [shell 2]: Launch (Rviz + robot_state_publisher + draw_node + main_node)
+ros2 launch my_delta_robot display.launch.py
 
-# [shell 3]: Path Node and Torques
-ros2 run delta_robot main_node
+# [shell 3]: Run rqt_graph to visualize nodes and topics
+ros2 run rqt_gui rqt_gui --standalone rqt_graph.ros_graph.RosGraph
 
-# [shell 4]: Run Node
-ros2 run delta_robot node_b
+# ROS2 topic examples (trajectory / joint_states)
+ros2 topic pub --once /input_ls_final my_delta_robot/msg/LinearSpeedXYZ "{xo: 0.0, yo: 0.0, zo: -375.0, xf: 0.0, yf: 0.0, zf: -490.0, vmax: 200.0, amax: 10000.0, gripper: 0}"
+ros2 topic pub --once /input_ls_final my_delta_robot/msg/LinearSpeedXYZ "{xo: 0.0, yo: 0.0, zo: -490.0, xf: 0.0, yf: 0.0, zf: -375.0, vmax: 200.0, amax: 10000.0, gripper: 0}"
 
-# [shell 5]: Run Node
-ros2 run delta_robot node_a
-
-# [shell 6]: Run Node
-ros2 run delta_robot camera_node.py
-
-# [shell 7]: Run rqt_graph to visualize the relation between Node and Topic
-ros2 run rqt_graph rqt_graph
-
-# [shell 8]: Message for the torques and trajectories node
-rostopic pub -1 /input_ls_final delta_robot/linear_speed_xyz -- 0.0 0.0 -375.0 0.0 0.0 -490.0 200.0 10000.0
-rostopic pub -1 /input_ls_final delta_robot/linear_speed_xyz -- 0.0 0.0 -490.0 0.0 0.0 -375.0 200.0 10000.0
-rostopic pub -1 /input_ls_final delta_robot/linear_speed_xyz -- 0.0 0.0 -375.0 0.0 150.0 -490.0 200.0 10000.0
-rostopic pub -1 /input_ls_final delta_robot/linear_speed_xyz -- 0.0 150.0 -490.0 0.0 -150.0 -490.0 200.0 10000.0
-rostopic pub -1 /input_ls_final delta_robot/linear_speed_xyz -- 0.0 -150.0 -490.0 0.0 0.0 -375.0 200.0 10000.0
-
-rostopic pub -1 /status_to_image_node std_msgs/String -- "Done"
-
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#MOVEIT
-
-# set position of current point of robot delta
-rostopic pub -1 /set_current_point delta_robot/Posicionxyz -- 0.0 0.0 -375 -1
-
-# set start point grip distance
-rostopic pub -1 /set_current_point delta_robot/Posicionxyz -- 20.0 0.0 0.0 3
-
-# set end point grip distance
-rostopic pub -1 /set_current_point delta_robot/Posicionxyz -- 20.0 0.0 0.0 4
-
-# set start and end point grip distance
-rostopic pub -1 /set_current_point delta_robot/Posicionxyz -- 20.0 20.0 0.0 5
-
-# start to draw square if run node draw
-rostopic pub -1 /set_current_point delta_robot/Posicionxyz -- 0.0 0.0 0.0 6
+# set current point (draw_node)
+ros2 topic pub --once /set_current_point my_delta_robot/msg/Posicionxyz "{x0: 0.0, y0: 0.0, z0: -375.0, type: -1}"
+ros2 topic pub --once /set_current_point my_delta_robot/msg/Posicionxyz "{x0: 20.0, y0: 0.0, z0: 0.0, type: 3}"
 ros2 topic pub --once /set_current_point my_delta_robot/msg/Posicionxyz "{x0: 0.0, y0: 0.0, z0: 0.0, type: 6}"
-
-# start to draw triangle if run node draw
-rostopic pub -1 /set_current_point delta_robot/Posicionxyz -- 0.0 0.0 0.0 7
 ros2 topic pub --once /set_current_point my_delta_robot/msg/Posicionxyz "{x0: 0.0, y0: 0.0, z0: 0.0, type: 7}"
 
-# set position of circle point of robot delta when grip release
-rostopic pub -1 /set_current_point delta_robot/Posicionxyz -- 20.0 20.0 0.0 0
-
-# set position of square point of robot delta when grip release
-rostopic pub -1 /set_current_point delta_robot/Posicionxyz -- 20.0 20.0 0.0 1
-
-# set position of triangle point of robot delta when grip release
-rostopic pub -1 /set_current_point delta_robot/Posicionxyz -- 20.0 20.0 0.0 2
-
-# set numpoint 
-rostopic pub -1 /set_num_point delta_robot/num_point -- 120 200
-
-# set vmax and a max for robot
-rostopic pub -1 /set_vmax_amax delta_robot/vmax_amax -- 1500.0 200000.0
+# set resolution and vmax/amax
+ros2 topic pub --once /set_num_point my_delta_robot/msg/NumPoint "{resolution: 120}"
 ros2 topic pub --once /set_vmax_amax my_delta_robot/msg/VmaxAmax "{vmax: 1500.0, amax: 200000.0}"
-ros2 topic pub --once /set_vmax_amax my_delta_robot/msg/VmaxAmax "{vmax: 10.0, amax: 200.0}"
 
 # Another way to build project, 
 cmake ../src/ -DPython3_FIND_VIRTUALENV=ONLY
 
 ros2 launch my_delta_robot display.launch.py
+
+colcon build --symlink-install --cmake-args -DPython3_FIND_VIRTUALENV=ONLY --packages-select my_delta_robot
+
+# to run tests after a build:
+source install/setup.bash
+colcon test --packages-select my_delta_robot
