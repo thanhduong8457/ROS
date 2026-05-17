@@ -57,8 +57,8 @@ rosidl_target_interfaces(main_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 # add_executable(serial_module src/serial_module.cpp)
 # ament_target_dependencies(serial_module rclcpp std_msgs sensor_msgs urdf geometry_msgs)
-# rosidl_target_interfaces(serial_module ${PROJECT_NAME} "rosidl_typesupport_cpp")
 # target_link_libraries(serial_module ${serial_LIBRARIES})
+# rosidl_target_interfaces(serial_module ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(draw_node src/draw_node.cpp)
 ament_target_dependencies(draw_node rclcpp std_msgs sensor_msgs urdf geometry_msgs)
@@ -91,5 +91,13 @@ install(DIRECTORY urdf
 install(DIRECTORY rviz
     DESTINATION share/${PROJECT_NAME}
 )
+
+# Unit tests (optional: build with --cmake-args -DBUILD_TESTING=ON)
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_delta_robot test/test_delta_robot.cpp)
+  target_include_directories(test_delta_robot PRIVATE ${CMAKE_SOURCE_DIR}/delta_robot)
+  target_link_libraries(test_delta_robot delta_robot)
+endif()
 
 ament_package()

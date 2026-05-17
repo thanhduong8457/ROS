@@ -7,13 +7,11 @@ import os
 def generate_launch_description():
     package_name = 'my_delta_robot'
     
-    # Get URDF file path
-    urdf_path = os.path.join(
-        get_package_share_directory(package_name),
-        '../../../../src/urdf',
-        'delta_robot.urdf'  # Change to delta_robot.urdf.xacro if needed
-    )
-    
+    # Use installed share paths (urdf/ and rviz/ are installed by CMakeLists.txt)
+    pkg_share = get_package_share_directory(package_name)
+    urdf_path = os.path.join(pkg_share, 'urdf', 'delta_robot.urdf')
+    rviz_config_path = os.path.join(pkg_share, 'rviz', 'my_config.rviz')
+
     # Ensure the URDF file exists
     if not os.path.exists(urdf_path):
         raise FileNotFoundError(f"URDF file not found: {urdf_path}")
@@ -37,18 +35,9 @@ def generate_launch_description():
             executable='rviz2',
             name='rviz2',
             output='screen',
-            arguments=['-d', os.path.join(get_package_share_directory(package_name), 
-                '../../../../src/rviz', 
-                'my_config.rviz'
-            )]
+            arguments=['-d', rviz_config_path]
         ),
-        # Initial Pose Publisher
-        Node(
-            package='my_delta_robot',
-            executable='initial_pose_publisher.py',
-            name='initial_pose_publisher',
-            output='screen'
-        ),
+        # main_node publishes initial joint_states; initial_pose_publisher omitted to avoid duplicate /joint_states
         # draw_node
         Node(
             package='my_delta_robot',

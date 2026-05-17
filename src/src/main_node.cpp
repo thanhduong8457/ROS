@@ -7,10 +7,11 @@
 #include "my_delta_robot/msg/vmax_amax.hpp"
 
 #include "delta_robot.h"
+#include <memory>
 
 class MyNode: public rclcpp::Node {
     int gripper;
-    delta_robot *m_delta_robot;
+    std::unique_ptr<delta_robot> m_delta_robot;
 
     double position_value[13];
 
@@ -56,15 +57,12 @@ public:
         JointState.name[11] = "act_z";
         JointState.name[12] = "gripper";
 
-        m_delta_robot = new delta_robot(); // construct a new delta_robot
-        m_delta_robot->set_vmax_amax(1500, 200000); // set vmax and amax
+        m_delta_robot = std::make_unique<delta_robot>();
+        m_delta_robot->set_vmax_amax(1500, 200000);
         m_delta_robot->set_resolution(120);
-
         gripper = 0;
-    }
 
-    ~MyNode() {
-        delete m_delta_robot;
+        publish_initial_joint_state();
     }
 private:
     void callback_linear_speed_xyz(const my_delta_robot::msg::LinearSpeedXYZ::SharedPtr msg) {
@@ -99,65 +97,80 @@ private:
     }
     
     /// @brief 
+    void publish_initial_joint_state() {
+        for (int j = 0; j < 12; j++) {
+            JointState.position[j] = 0.0;
+        }
+        JointState.position[0] = JointState.position[1] = JointState.position[2] = 0.000266;
+        JointState.position[3] = JointState.position[5] = JointState.position[7] = 0.9382;
+        JointState.position[4] = JointState.position[6] = JointState.position[8] = 0.0;
+        JointState.position[9] = JointState.position[10] = 0.0;
+        JointState.position[11] = -0.375;
+        JointState.position[12] = 0.0;
+        JointState.header.stamp = this->now();
+        pub_for_rviz->publish(JointState);
+    }
+
     void main_func() {
+        if (!rclcpp::ok()) return;
+
+        m_delta_robot->system_linear();
+        m_delta_robot->TrapezoidalVelocityProfile();
+        m_delta_robot->system_linear_matrix();
+
+        if (m_delta_robot->m_data_delta.empty()) {
+            RCLCPP_WARN(this->get_logger(), "Trajectory produced no points; skipping.");
+            return;
+        }
+
+        RCLCPP_INFO(this->get_logger(), "Creating Linear Path RVIZ!");
+
         double delta = 0;
-        if (rclcpp::ok()) {
-            m_delta_robot->system_linear();
-            m_delta_robot->TrapezoidalVelocityProfile(); // Trapezoidal velocity profile
-            m_delta_robot->system_linear_matrix();
+        vm_am.vmax = m_delta_robot->m_data_delta[0]->vel;
+        vm_am.amax = m_delta_robot->m_data_delta[0]->acel;
+        v_a_out->publish(vm_am);
 
-            RCLCPP_INFO(this->get_logger(), "Creating Linear Path RVIZ!");
+        for (size_t i = 1; i < m_delta_robot->m_data_delta.size(); i++) {
+            m_delta_robot->m_data_delta[i]->theta_val = m_delta_robot->inverse(m_delta_robot->m_data_delta[i]->position_val);
 
-            // publish data of velocity and acceleration to visualize on rpt_plot
-            vm_am.vmax = m_delta_robot->m_data_delta[0]->vel;
-            vm_am.amax = m_delta_robot->m_data_delta[0]->acel;
+            m_delta_robot->create_joint_state_list(
+                m_delta_robot->m_data_delta[i]->position_val,
+                m_delta_robot->m_data_delta[i]->theta_val,
+                position_value
+            );
+
+            delta = (m_delta_robot->m_data_delta[i]->time_point - m_delta_robot->m_data_delta[i - 1]->time_point) * 10;
+            if (delta <= 0.0) delta = 0.01;
+
+            for (int j = 0; j < 12; j++) {
+                JointState.position[j] = position_value[j];
+            }
+            JointState.position[12] = gripper;
+            JointState.header.stamp = this->now();
+            pub_for_rviz->publish(JointState);
+
+            vm_am.vmax = m_delta_robot->m_data_delta[i]->vel;
+            vm_am.amax = m_delta_robot->m_data_delta[i]->acel;
             v_a_out->publish(vm_am);
 
-            for (unsigned int i = 1; i < m_delta_robot->m_data_delta.size(); i++) {
-                m_delta_robot->m_data_delta[i]->theta_val = m_delta_robot->inverse(m_delta_robot->m_data_delta[i]->position_val);
-
-                m_delta_robot->create_joint_state_list(
-                    m_delta_robot->m_data_delta[i]->position_val,
-                    m_delta_robot->m_data_delta[i]->theta_val,
-                    position_value
-                );
-
-                delta = m_delta_robot->m_data_delta[i]->time_point * 10 - m_delta_robot->m_data_delta[i - 1]->time_point * 10; // bug index out range
-
-                // publish data of joints state to topic /joint_states
-                for (int j = 0; j < 12; j++) {
-                    JointState.position[j] = position_value[j];
-                }
-
-                JointState.position[12] = gripper;
-                JointState.header.stamp = this->now();
-                pub_for_rviz->publish(JointState);
-
-                // publish data of velocity and acceleration to visualize on rpt_plot
-                vm_am.vmax = m_delta_robot->m_data_delta[i]->vel;
-                vm_am.amax = m_delta_robot->m_data_delta[i]->acel;
-                v_a_out->publish(vm_am);
-
-                rclcpp::Rate rate(1.0 / delta);
-                rate.sleep();
-            }
-
-            // dump status
-            msg.data = "(" + std::to_string(m_delta_robot->mStartPoint.x) + ", " 
-                        + std::to_string(m_delta_robot->mStartPoint.y) + ", " 
-                        + std::to_string(m_delta_robot->mStartPoint.z) + ") -> (" 
-                        + std::to_string(m_delta_robot->mEndPoint.x) + ", " 
-                        + std::to_string(m_delta_robot->mEndPoint.y) + ", " 
-                        + std::to_string(m_delta_robot->mEndPoint.z) + ") DONE";
-            status_to_node_b->publish(msg);
+            rclcpp::Rate rate(1.0 / delta);
+            rate.sleep();
         }
+
+        msg.data = "(" + std::to_string(m_delta_robot->mStartPoint.x) + ", "
+                    + std::to_string(m_delta_robot->mStartPoint.y) + ", "
+                    + std::to_string(m_delta_robot->mStartPoint.z) + ") -> ("
+                    + std::to_string(m_delta_robot->mEndPoint.x) + ", "
+                    + std::to_string(m_delta_robot->mEndPoint.y) + ", "
+                    + std::to_string(m_delta_robot->mEndPoint.z) + ") DONE";
+        status_to_node_b->publish(msg);
     }
 
     /// @brief 
     /// @param msg 
     void set_vmax_amax_callback(const my_delta_robot::msg::VmaxAmax::SharedPtr msg) {
         m_delta_robot->set_vmax_amax(msg->vmax, msg->amax);
-        cout << "set vmax = " << msg->vmax << ", and set amax = " << msg->amax << endl;
+        std::cout << "set vmax = " << msg->vmax << ", and set amax = " << msg->amax << std::endl;
     }
 };
 

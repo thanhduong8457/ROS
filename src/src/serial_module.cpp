@@ -3,6 +3,8 @@
 #include <vector>
 #include <stdio.h>
 
+#include "common.h"
+
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "my_delta_robot/msg/position_arm.hpp"
@@ -10,8 +12,6 @@
 #include <serial/serial.h>
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/empty.hpp>
-
-#define pi 3.141592654
 
 using namespace std;
 
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
     auto node = rclcpp::Node::make_shared("serial_module");
 
     auto sub = node->create_subscription<sensor_msgs::msg::JointState>("/joint_states", 10, MoveGroupCallback);
-    auto chatter_pub = node->create_publisher<delta_robot::msg::PositionArm>("thanhduong", 10);
+    auto chatter_pub = node->create_publisher<my_delta_robot::msg::PositionArm>("thanhduong", 10);
 
     try {
         ser.setPort("/dev/ttyTHS1");
@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
 
     rclcpp::Rate loop_rate(50);
 
-    delta_robot::msg::PositionArm PositionArm;
+    my_delta_robot::msg::PositionArm PositionArm;
 
     while (rclcpp::ok()) {
         PositionArm.base_brazo1 = my_joint[0]->position;

@@ -1,12 +1,9 @@
 #include <iostream>
 #include <chrono>
-#include <thread>
-#include "vector"
-#include "math.h"
+#include <vector>
+#include <cmath>
 
-using namespace std;
-using namespace std::this_thread; // sleep_for, sleep_until
-using namespace std::chrono; // nanoseconds, system_clock, seconds
+// Avoid "using namespace std" in headers; use std:: in .cpp files as needed
 
 #define sqrt3   1.732050808
 #define pi      3.141592654
@@ -49,15 +46,21 @@ public:
     Point() {
         init();
     }
+    Point(const Point& other) {
+        this->x = other.x;
+        this->y = other.y;
+        this->z = other.z;
+    }
 
     bool operator!=(const Point& other) const {
         return this->x != other.x || this->y != other.y || this->z != other.z;
     }
 
-    void operator=(const Point& other) {
+    Point& operator=(const Point& other) {
         this->x = other.x;
         this->y = other.y;
         this->z = other.z;
+        return *this;
     }
 
     void init() {
@@ -67,7 +70,7 @@ public:
     }
 };
 
-/// @brief 
+/// @brief The Theta class represents the angles of the delta robot's arms.
 class Theta {
 public:
     double angle1;
@@ -78,10 +81,17 @@ public:
         init();
     }
 
-    void operator=(const Theta& other) {
+    Theta(const Theta& other) {
         this->angle1 = other.angle1;
         this->angle2 = other.angle2;
         this->angle3 = other.angle3;
+    }
+
+    Theta& operator=(const Theta& other) {
+        this->angle1 = other.angle1;
+        this->angle2 = other.angle2;
+        this->angle3 = other.angle3;
+        return *this;
     }
 
     void init(void) {
@@ -110,11 +120,3 @@ typedef struct data_delta {
 
     double time_point; //
 }data_delta_t;
-
-void punto_codo(double theta, double(&b1)[3]);
-void rotation120(double ent[3], double(&sal)[3]);
-void rotation240(double ent[3], double(&sal)[3]);
-void punto_ee(int brazo, double eee[3], double(&sal)[3]);
-void sum_vector(double v1[3], double v2[3], double(&s)[3]);
-void angulos_codo(int brazo, double codo[3], double eee[3], double& ang_a, double& ang_b);
-void rotation_y(double ent[3], double ang, double(&sal)[3]);

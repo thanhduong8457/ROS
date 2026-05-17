@@ -37,3 +37,7 @@
 build/
 install/
 log/
+
+# Generated URDF / Graphviz
+src/urdf/*.gv
+src/urdf/*.pdf
