@@ -52,7 +52,7 @@ public:
 
     void system_linear(void);
     void system_linear_matrix(void);
-    void create_joint_state_list(Point point, Theta theta, double(&position)[13]);
+    void create_joint_state_list(Point point, Theta theta, double(&position)[12]);
     void inverse_all_joint_state_exist(void);
 
     void set_vmax_amax(unsigned int vmax, unsigned int amax);

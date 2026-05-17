@@ -23,6 +23,20 @@ TEST(DeltaRobot, InverseAtOrigin) {
   EXPECT_FALSE(std::isnan(theta.angle3));
 }
 
+TEST(DeltaRobot, ActuatorJointsAtHomePose) {
+  delta_robot robot;
+  Point tcp;
+  tcp.x = 0.0;
+  tcp.y = 0.0;
+  tcp.z = -0.375;
+  Theta theta = robot.inverse(tcp);
+  double joints[12] = {};
+  robot.create_joint_state_list(tcp, theta, joints);
+  EXPECT_NEAR(joints[9], 0.0, 1e-6);
+  EXPECT_NEAR(joints[10], 0.0, 1e-6);
+  EXPECT_NEAR(joints[11], -0.375, 1e-4);
+}
+
 TEST(DeltaRobot, SetVmaxAmax) {
   delta_robot robot;
   robot.set_vmax_amax(1000, 100000);

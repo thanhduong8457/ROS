@@ -52,8 +52,12 @@ public:
         this->z = other.z;
     }
 
+    bool operator==(const Point& other) const {
+        return this->x == other.x && this->y == other.y && this->z == other.z;
+    }
+
     bool operator!=(const Point& other) const {
-        return this->x != other.x || this->y != other.y || this->z != other.z;
+        return !(*this == other);
     }
 
     Point& operator=(const Point& other) {

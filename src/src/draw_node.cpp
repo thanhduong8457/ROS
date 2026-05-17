@@ -1,366 +1,313 @@
-#include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
-#include <stdio.h>
-// #include <mutex>
-// #include <condition_variable>
-// #include <atomic>
-// #include <csignal>
 
+#include "common.h"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "my_delta_robot/msg/linear_speed_xyz.hpp"
 #include "my_delta_robot/msg/posicionxyz.hpp"
-#include "my_delta_robot/msg/vmax_amax.hpp"
 
-#include "common.h"
+namespace {
 
-using namespace std;
-
-enum {
-    circle = 0,
-    square,
-    triangle
+enum ShapeType : int {
+    kCircle = 0,
+    kSquare,
+    kTriangle,
 };
 
-enum {
-    CURRENT_POINT = -1,
-    CIRCLE_POSITION = 0,
-    SQUARE_POSITION,
-    TRIANGLE,
-    Z_START,
-    Z_END,
-    Z_START_END,
-    DRAW_SQUARE,
-    DRAW_TRIANGLE
+enum SetPointType : int {
+    kCurrentPoint = -1,
+    kCirclePosition = 0,
+    kSquarePosition,
+    kTrianglePosition,
+    kZStart,
+    kZEnd,
+    kZStartEnd,
+    kDrawSquare,
+    kDrawTriangle,
 };
 
-class Draw : public rclcpp::Node {
+constexpr double kDefaultZMin = -480.0;
+constexpr double kDefaultZMax = -375.0;
+
+}  // namespace
+
+class DrawNode : public rclcpp::Node {
 public:
-    Draw() : Node("draw_node"), loop_rate(1) {
-        RCLCPP_INFO(this->get_logger(), "draw_node is created");
+    DrawNode()
+    : Node("draw_node"),
+      notify_node_a_(false),
+      z_start_(20.0),
+      z_end_(10.0),
+      waypoint_queue_(),
+      current_point_(),
+      square_corners_{},
+      circle_point_(),
+      square_point_(),
+      triangle_point_(),
+      last_command_{0.0, 0.0, 0.0} {
+        RCLCPP_INFO(get_logger(), "draw_node started");
 
-        receive_node_a = this->create_subscription<my_delta_robot::msg::Posicionxyz>("send_to_node_b", 10, std::bind(&Draw::node_a_callback, this, std::placeholders::_1));
-        set_current_point = this->create_subscription<my_delta_robot::msg::Posicionxyz>("set_current_point", 10, std::bind(&Draw::set_current_point_callback, this, std::placeholders::_1));
-        sub_status_delta = this->create_subscription<std_msgs::msg::String>("status_delta", 10, std::bind(&Draw::Status_Delta_Callback, this, std::placeholders::_1));
+        sub_send_to_draw_ = create_subscription<my_delta_robot::msg::Posicionxyz>(
+            "send_to_node_b", 10,
+            std::bind(&DrawNode::onExternalPoint, this, std::placeholders::_1));
+        sub_set_current_point_ = create_subscription<my_delta_robot::msg::Posicionxyz>(
+            "set_current_point", 10,
+            std::bind(&DrawNode::onSetCurrentPoint, this, std::placeholders::_1));
+        sub_status_delta_ = create_subscription<std_msgs::msg::String>(
+            "status_delta", 10,
+            std::bind(&DrawNode::onTrajectoryDone, this, std::placeholders::_1));
 
-        chatter_pub = this->create_publisher<my_delta_robot::msg::LinearSpeedXYZ>("input_ls_final", 10);
-        status_to_node_a = this->create_publisher<std_msgs::msg::String>("status_to_node_a", 10);
+        pub_linear_speed_ = create_publisher<my_delta_robot::msg::LinearSpeedXYZ>(
+            "input_ls_final", 10);
+        pub_status_to_node_a_ = create_publisher<std_msgs::msg::String>(
+            "status_to_node_a", 10);
 
-        // Setting default values
-        mCurrentPoint.x = 0.0;
-        mCurrentPoint.y = 0.0;
-        mCurrentPoint.z = -375.0;
+        current_point_.x = 0.0;
+        current_point_.y = 0.0;
+        current_point_.z = -375.0;
 
-        mCirclePoint.x = -100.0;
-        mCirclePoint.y = -100.0;
-        mCirclePoint.z = -453.0;
+        circle_point_.x = -100.0;
+        circle_point_.y = -100.0;
+        circle_point_.z = -453.0;
 
-        mSquarePoint.x = 0.0;
-        mSquarePoint.y = -100.0;
-        mSquarePoint.z = -453.0;
+        square_point_.x = 0.0;
+        square_point_.y = -100.0;
+        square_point_.z = -453.0;
 
-        mTrianglePoint.x = 100.0;
-        mTrianglePoint.y = -100.0;
-        mTrianglePoint.z = -453.0;
+        triangle_point_.x = 100.0;
+        triangle_point_.y = -100.0;
+        triangle_point_.z = -453.0;
 
-        z_start = 20;
-        z_end = 10;
-
-        mPointA.x = 0.0;
-        mPointA.y = z_end;
-        mPointA.z = -453.0;
-
-        mPointB.x = -z_end;
-        mPointB.y = 0.0;
-        mPointB.z = -453.0;
-
-        mPointC.x = 0.0;
-        mPointC.y = -z_end;
-        mPointC.z = -453.0;
-
-        mPointD.x = z_end;
-        mPointD.y = 0.0;
-        mPointD.z = -453.0;
-
-        status = false;
-        is_send_status_to_node_a = false;
-
-        // Create a thread to handle the main processing loop
-        // processing_thread = std::thread(&Draw::MainProcessFunction, this);
-    }
-
-    ~Draw() {
-
+        square_corners_[0] = {0.0, z_end_, -453.0};
+        square_corners_[1] = {-z_end_, 0.0, -453.0};
+        square_corners_[2] = {0.0, -z_end_, -453.0};
+        square_corners_[3] = {z_end_, 0.0, -453.0};
     }
 
 private:
-    vector<Point *> my_point;
-    bool status;
-    bool is_send_status_to_node_a;
+    void enqueuePoint(double x, double y, double z) {
+        waypoint_queue_.emplace_back(x, y, z);
+        RCLCPP_DEBUG(get_logger(), "Waypoint queued: (%.2f, %.2f, %.2f)", x, y, z);
+    }
 
-    double z_start, z_end;
-    double xx, yy, zz;
+    void publishNextSegment() {
+        if (!rclcpp::ok() || waypoint_queue_.empty()) {
+            return;
+        }
 
-    Point mCurrentPoint;
-    Point mPointA;
-    Point mPointB;
-    Point mPointC;
-    Point mPointD;
-    Point mCirclePoint;
-    Point mSquarePoint;
-    Point mTrianglePoint;
+        while (!waypoint_queue_.empty() && current_point_ == waypoint_queue_.front()) {
+            RCLCPP_INFO(get_logger(), "Skipping duplicate waypoint");
+            waypoint_queue_.erase(waypoint_queue_.begin());
+        }
+        if (waypoint_queue_.empty()) {
+            return;
+        }
 
-    std::mutex mProcessingMutex;
-    std::condition_variable mConditionProcess;
-    std::atomic<bool> mSignalScheduleSwitch{false};
-    std::atomic<bool> running{true};
+        const Point & target = waypoint_queue_.front();
+        my_delta_robot::msg::LinearSpeedXYZ cmd;
+        cmd.xo = current_point_.x;
+        cmd.yo = current_point_.y;
+        cmd.zo = current_point_.z;
+        cmd.xf = target.x;
+        cmd.yf = target.y;
+        cmd.zf = target.z;
+        cmd.gripper = 0;
+        pub_linear_speed_->publish(cmd);
 
-    rclcpp::Rate loop_rate;
-    std::shared_ptr<rclcpp::Subscription<my_delta_robot::msg::Posicionxyz>> receive_node_a;
-    std::shared_ptr<rclcpp::Subscription<my_delta_robot::msg::Posicionxyz>> set_current_point;
-    std::shared_ptr<rclcpp::Subscription<std_msgs::msg::String>> sub_status_delta;
-    std::shared_ptr<rclcpp::Publisher<my_delta_robot::msg::LinearSpeedXYZ>> chatter_pub;
-    std::shared_ptr<rclcpp::Publisher<std_msgs::msg::String>> status_to_node_a;
+        RCLCPP_INFO(
+            get_logger(),
+            "Move from (%.2f, %.2f, %.2f) to (%.2f, %.2f, %.2f)",
+            current_point_.x, current_point_.y, current_point_.z,
+            target.x, target.y, target.z);
 
-    // std::thread processing_thread;
-
-    void MainProcessFunction() {
-        my_delta_robot::msg::LinearSpeedXYZ linear_speed_xyz;
-        std_msgs::msg::String msg;
-        bool is_proccess_ok = false;
-        if (rclcpp::ok()) {
-            while (false == is_proccess_ok) {
-                if (mCurrentPoint != *(my_point[0])) {
-                    cout << "process for next position\n";
-                    is_proccess_ok = true;
-                }
-                else {
-                    RCLCPP_INFO(this->get_logger(), "remove duplicate point");
-                    delete my_point[0];
-                    my_point.erase(my_point.begin());
-                    if(0 == my_point.size()) {
-                        return;
-                    }
-                    else {
-                        mCurrentPoint = *(my_point[0]);
-                    }
-                }
-            }
-            
-            linear_speed_xyz.xo = mCurrentPoint.x;
-            linear_speed_xyz.yo = mCurrentPoint.y;
-            linear_speed_xyz.zo = mCurrentPoint.z;
-            linear_speed_xyz.xf = my_point[0]->x;
-            linear_speed_xyz.yf = my_point[0]->y;
-            linear_speed_xyz.zf = my_point[0]->z;
-            linear_speed_xyz.gripper = 0;
-            // linear_speed_xyz.gripper = my_point[0]->gripper;
-            loop_rate.sleep();
-            chatter_pub->publish(linear_speed_xyz);
-
-            cout << "Move from (" 
-                << mCurrentPoint.x << ", " 
-                << mCurrentPoint.y << ", " 
-                << mCurrentPoint.z
-                << ") to (" 
-                << my_point[0]->x << ", "
-                << my_point[0]->y << ", " 
-                << my_point[0]->z << ")" << endl;
-
-            if (is_send_status_to_node_a) {
-                msg.data = "Point [" + to_string(xx) + " " + to_string(yy) + " " + to_string(zz) + "] is finished";
-                status_to_node_a->publish(msg);
-                is_send_status_to_node_a = false;
-            }
+        if (notify_node_a_) {
+            std_msgs::msg::String msg;
+            msg.data = "Point [" + std::to_string(last_command_.x) + " "
+                + std::to_string(last_command_.y) + " "
+                + std::to_string(last_command_.z) + "] is finished";
+            pub_status_to_node_a_->publish(msg);
+            notify_node_a_ = false;
         }
     }
 
-    /// @brief 
-    /// @param x 
-    /// @param y 
-    /// @param z 
-    /// @param gripper 
-    void add_point(double x, double y, double z, int gripper) {
-        Point *data = new Point(x, y, z);
-        // data->gripper = gripper;
-        my_point.push_back(data);
+    void onTrajectoryDone(const std_msgs::msg::String::SharedPtr msg) {
+        RCLCPP_INFO(get_logger(), "status from main_node: %s", msg->data.c_str());
 
-        cout << "point added with x=" << x << ", y=" << y << ", z=" << z << ", gripper=" << gripper << endl;
-    }
-
-    /// @brief 
-    /// @param msg 
-    void Status_Delta_Callback(const std_msgs::msg::String::SharedPtr msg) {
-        RCLCPP_INFO(this->get_logger(), "status from main_node: \n%s", msg->data.c_str());
-
-        if (my_point.size() != 0) {
-            mCurrentPoint = *(my_point[0]);
-            delete my_point[0];
-            my_point.erase(my_point.begin());
+        if (!waypoint_queue_.empty()) {
+            current_point_ = waypoint_queue_.front();
+            waypoint_queue_.erase(waypoint_queue_.begin());
         }
 
-        if (my_point.size() != 0) {
-            is_send_status_to_node_a = true;
-            MainProcessFunction();
+        if (!waypoint_queue_.empty()) {
+            notify_node_a_ = true;
+            publishNextSegment();
         }
     }
 
-    /// @brief 
-    /// @param msg 
-    void node_a_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
-        xx = msg->x0;
-        yy = msg->y0;
-        zz = msg->z0;
-        int type = msg->type;
+    void onExternalPoint(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
+        last_command_.x = msg->x0;
+        last_command_.y = msg->y0;
+        last_command_.z = msg->z0;
+        const int type = static_cast<int>(msg->type);
 
-        cout << "Processing point x: " << xx << " y: " << yy << " z: " << zz << endl;
+        RCLCPP_INFO(
+            get_logger(), "External point (%.2f, %.2f, %.2f) type=%d",
+            last_command_.x, last_command_.y, last_command_.z, type);
 
-        add_point(mCurrentPoint.x, mCurrentPoint.y, mCurrentPoint.z, 0);
-
-        add_point(xx, yy, zz, 0);
-        add_point(xx, yy, zz - z_start, 1);
-        add_point(xx, yy, zz, 1);
+        enqueuePoint(current_point_.x, current_point_.y, current_point_.z);
+        enqueuePoint(last_command_.x, last_command_.y, last_command_.z);
+        enqueuePoint(last_command_.x, last_command_.y, last_command_.z - z_start_);
+        enqueuePoint(last_command_.x, last_command_.y, last_command_.z);
 
         switch (type) {
-        case circle:
-            add_point(mCirclePoint.x, mCirclePoint.y, mCirclePoint.z, 1);
-            add_point(mCirclePoint.x, mCirclePoint.y, mCirclePoint.z - z_end, 0);
-            add_point(mCirclePoint.x, mCirclePoint.y, mCirclePoint.z, 0);
-            break;
-
-        case square:
-            add_point(mSquarePoint.x, mSquarePoint.y, mSquarePoint.z, 1);
-            add_point(mSquarePoint.x, mSquarePoint.y, mSquarePoint.z - z_end, 0);
-            add_point(mSquarePoint.x, mSquarePoint.y, mSquarePoint.z, 0);
-            break;
-
-        case triangle:
-            add_point(mTrianglePoint.x, mSquarePoint.y, mSquarePoint.z, 1);
-            add_point(mTrianglePoint.x, mSquarePoint.y, mSquarePoint.z - z_end, 0);
-            add_point(mTrianglePoint.x, mSquarePoint.y, mSquarePoint.z, 0);
-            break;
-
-        default:
-            break;
+            case kCircle:
+                enqueuePoint(circle_point_.x, circle_point_.y, circle_point_.z);
+                enqueuePoint(circle_point_.x, circle_point_.y, circle_point_.z - z_end_);
+                enqueuePoint(circle_point_.x, circle_point_.y, circle_point_.z);
+                break;
+            case kSquare:
+                enqueuePoint(square_point_.x, square_point_.y, square_point_.z);
+                enqueuePoint(square_point_.x, square_point_.y, square_point_.z - z_end_);
+                enqueuePoint(square_point_.x, square_point_.y, square_point_.z);
+                break;
+            case kTriangle:
+                enqueuePoint(triangle_point_.x, square_point_.y, square_point_.z);
+                enqueuePoint(triangle_point_.x, square_point_.y, square_point_.z - z_end_);
+                enqueuePoint(triangle_point_.x, square_point_.y, square_point_.z);
+                break;
+            default:
+                break;
         }
 
-        MainProcessFunction();
+        publishNextSegment();
     }
 
-    /// @brief 
-    /// @param msg 
-    void set_current_point_callback(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
-        int temp = msg->type;
-        bool zuo_bu_zuo = true;
-        my_point.clear(); // clear all data inside
+    void onSetCurrentPoint(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
+        const int type = static_cast<int>(msg->type);
+        bool should_publish = true;
+        waypoint_queue_.clear();
 
-        switch (temp) {
-        case (CURRENT_POINT):
-            mCurrentPoint.x = msg->x0;
-            mCurrentPoint.y = msg->y0;
-            mCurrentPoint.z = msg->z0;
+        switch (type) {
+            case kCurrentPoint:
+                current_point_.x = msg->x0;
+                current_point_.y = msg->y0;
+                current_point_.z = msg->z0;
+                if (current_point_.z > kDefaultZMax || current_point_.z < kDefaultZMin) {
+                    current_point_.z = kDefaultZMax;
+                    RCLCPP_WARN(
+                        get_logger(),
+                        "Invalid Z; current point clamped to (%.2f, %.2f, %.2f)",
+                        current_point_.x, current_point_.y, current_point_.z);
+                } else {
+                    RCLCPP_INFO(
+                        get_logger(),
+                        "Current point set to (%.2f, %.2f, %.2f)",
+                        current_point_.x, current_point_.y, current_point_.z);
+                }
+                should_publish = false;
+                break;
 
-            if (mCurrentPoint.z > -375 || mCurrentPoint.z < -480) {
-                mCurrentPoint.z = -375.0;
-                cout << "[ERROR] Invalid point, current point now set to x: " << mCurrentPoint.x << " y: " << mCurrentPoint.y << " z: " << mCurrentPoint.z << endl;
-            } else {
-                cout << "current point set to point x: " << mCurrentPoint.x << " y: " << mCurrentPoint.y << " z: " << mCurrentPoint.z << endl;
-            }
-            zuo_bu_zuo = false;
-            break;
+            case kCirclePosition:
+                square_corners_[0].x = msg->x0;
+                square_corners_[0].y = msg->y0;
+                square_corners_[0].z = msg->z0;
+                RCLCPP_INFO(get_logger(), "Circle corner A updated");
+                break;
 
-        case (CIRCLE_POSITION):
-            mPointA.x = msg->x0;
-            mPointA.y = msg->y0;
-            mPointA.z = msg->z0;
-            cout << "Position to put CIRCLE is set to x: " << mPointA.x << " y: " << mPointA.y << " z: " << mPointA.z << endl;
-            break;
+            case kSquarePosition:
+                square_corners_[1].x = msg->x0;
+                square_corners_[1].y = msg->y0;
+                square_corners_[1].z = msg->z0;
+                RCLCPP_INFO(get_logger(), "Square corner B updated");
+                break;
 
-        case (SQUARE_POSITION):
-            mPointB.x = msg->x0;
-            mPointB.y = msg->y0;
-            mPointB.z = msg->z0;
-            cout << "Position to put SQUARE is set to x: " << mPointB.x << " y: " << mPointB.y << " z: " << mPointB.z << endl;
-            break;
+            case kTrianglePosition:
+                square_corners_[2].x = msg->x0;
+                square_corners_[2].y = msg->y0;
+                square_corners_[2].z = msg->z0;
+                RCLCPP_INFO(get_logger(), "Triangle corner C updated");
+                break;
 
-        case (TRIANGLE):
-            mPointC.x = msg->x0;
-            mPointC.y = msg->y0;
-            mPointC.z = msg->z0;
-            cout << "Position to put TRIANGLE is set to x: " << mPointC.x << " y: " << mPointC.y << " z: " << mPointC.z << endl;
-            break;
+            case kZStart:
+                z_start_ = msg->x0;
+                RCLCPP_INFO(get_logger(), "Z start offset set to %.2f", z_start_);
+                break;
 
-        case (Z_START):
-            z_start = msg->x0;
-            cout << "The distance to go down and grip when START is set to: " << z_start << endl;
-            break;
+            case kZEnd:
+                z_end_ = msg->x0;
+                RCLCPP_INFO(get_logger(), "Z end offset set to %.2f", z_end_);
+                break;
 
-        case (Z_END):
-            z_end = msg->x0;
-            cout << "The distance to go down and grip when END is set to: " << z_end << endl;
-            break;
+            case kZStartEnd:
+                z_start_ = msg->x0;
+                z_end_ = msg->y0;
+                RCLCPP_INFO(
+                    get_logger(), "Z offsets set: start=%.2f end=%.2f", z_start_, z_end_);
+                break;
 
-        case (Z_START_END):
-            z_start = msg->x0;
-            z_end = msg->y0;
-            cout << "The distance to go down and grip when START is set to: " << z_start << endl;
-            cout << "The distance to go down and grip when END is set to: " << z_end << endl;
-            break;
+            case kDrawSquare:
+                queueSquarePath();
+                break;
 
-        case (DRAW_SQUARE):
-            draw_new_square();
-            break;
+            case kDrawTriangle:
+                queueTrianglePath();
+                break;
 
-        case (DRAW_TRIANGLE):
-            draw_new_triangle();
-            break;
-
-        default:
-            cout << "mei you gong zuo hui zuo, qing ni you zuo ba!!!" << endl;
-            zuo_bu_zuo = false;
-            break;
+            default:
+                RCLCPP_WARN(get_logger(), "Unknown set_current_point type: %d", type);
+                should_publish = false;
+                break;
         }
-        
-        if (true == zuo_bu_zuo) {
-            MainProcessFunction();
+
+        if (should_publish) {
+            publishNextSegment();
         }
     }
 
-    /// @brief 
-    void draw_new_square() {
-        cout << "Draw Square" << endl;
-        // add_point(mCurrentPoint.x, mCurrentPoint.y, mCurrentPoint.z, 0);
-        add_point(mPointA.x, mPointA.y, mPointA.z - z_start, 0);
-        add_point(mPointB.x, mPointB.y, mPointB.z - z_start, 0);
-        add_point(mPointC.x, mPointC.y, mPointC.z - z_start, 0);
-        add_point(mPointD.x, mPointD.y, mPointD.z - z_start, 0);
-        add_point(mPointA.x, mPointA.y, mPointA.z - z_start, 0);
-        add_point(mCurrentPoint.x, mCurrentPoint.y, mCurrentPoint.z, 0);
-
+    void queueSquarePath() {
+        RCLCPP_INFO(get_logger(), "Queueing square draw path");
+        enqueuePoint(square_corners_[0].x, square_corners_[0].y, square_corners_[0].z - z_start_);
+        enqueuePoint(square_corners_[1].x, square_corners_[1].y, square_corners_[1].z - z_start_);
+        enqueuePoint(square_corners_[2].x, square_corners_[2].y, square_corners_[2].z - z_start_);
+        enqueuePoint(square_corners_[3].x, square_corners_[3].y, square_corners_[3].z - z_start_);
+        enqueuePoint(square_corners_[0].x, square_corners_[0].y, square_corners_[0].z - z_start_);
+        enqueuePoint(current_point_.x, current_point_.y, current_point_.z);
     }
 
-    /// @brief 
-    void draw_new_triangle() {
-        cout << "Draw Triangle" << endl;
-        // add_point(mCurrentPoint.x, mCurrentPoint.y, mCurrentPoint.z, 0);
-        add_point(mPointA.x, mPointA.y, mPointA.z - z_start, 0);
-        add_point(mPointB.x, mPointB.y, mPointB.z - z_start, 0);
-        add_point(mPointC.x, mPointC.y, mPointC.z - z_start, 0);
-        add_point(mPointA.x, mPointA.y, mPointA.z - z_start, 0);
-        add_point(mCurrentPoint.x, mCurrentPoint.y, mCurrentPoint.z, 0);
+    void queueTrianglePath() {
+        RCLCPP_INFO(get_logger(), "Queueing triangle draw path");
+        enqueuePoint(square_corners_[0].x, square_corners_[0].y, square_corners_[0].z - z_start_);
+        enqueuePoint(square_corners_[1].x, square_corners_[1].y, square_corners_[1].z - z_start_);
+        enqueuePoint(square_corners_[2].x, square_corners_[2].y, square_corners_[2].z - z_start_);
+        enqueuePoint(square_corners_[0].x, square_corners_[0].y, square_corners_[0].z - z_start_);
+        enqueuePoint(current_point_.x, current_point_.y, current_point_.z);
     }
+
+    bool notify_node_a_;
+    double z_start_;
+    double z_end_;
+
+    std::vector<Point> waypoint_queue_;
+    Point current_point_;
+    Point square_corners_[4];
+    Point circle_point_;
+    Point square_point_;
+    Point triangle_point_;
+    Point last_command_;
+
+    rclcpp::Subscription<my_delta_robot::msg::Posicionxyz>::SharedPtr sub_send_to_draw_;
+    rclcpp::Subscription<my_delta_robot::msg::Posicionxyz>::SharedPtr sub_set_current_point_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_status_delta_;
+
+    rclcpp::Publisher<my_delta_robot::msg::LinearSpeedXYZ>::SharedPtr pub_linear_speed_;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_status_to_node_a_;
 };
 
-/// @brief 
-/// @param argc 
-/// @param argv 
-/// @return 
-int main(int argc, char **argv) {
+int main(int argc, char ** argv) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<Draw>();
-
-    rclcpp::spin(node);
+    rclcpp::spin(std::make_shared<DrawNode>());
     rclcpp::shutdown();
     return 0;
 }

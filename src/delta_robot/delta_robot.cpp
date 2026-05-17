@@ -1,4 +1,5 @@
 #include "delta_robot.h"
+#include "joint_state_config.hpp"
 
 /// @brief 
 /// @param  
@@ -574,7 +575,7 @@ double delta_robot::angle_yz(Point point) {
 void delta_robot::create_joint_state_list(
     Point pointi,
     Theta theta,
-    double (&position)[13]
+    double (&position)[12]
 ) {
     // Rviz interior angles in Radians
     double punto[3] = {-pointi.y, -pointi.x, -pointi.z};
@@ -618,10 +619,9 @@ void delta_robot::create_joint_state_list(
     position[6]  = a2_b;
     position[7]  = theta.angle3 * dtr + a3_a;
     position[8]  = a3_b;
-    position[9]  = pointi.x;
-    position[10] = pointi.y;
-    position[11] = pointi.z;
-    // position[12] = gripper;
+    delta_robot_config::mapTcpToActuatorJoints(
+        pointi.x, pointi.y, pointi.z,
+        position[9], position[10], position[11]);
 
     // cout << "position[0]=" << position[0] << ", position[1]=" << position[1] << ", position[2]=" << position[2] << endl;
     // cout << "position[3]=" << position[3] << ", position[4]=" << position[4] << ", position[5]=" << position[5] << endl;

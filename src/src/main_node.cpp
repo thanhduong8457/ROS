@@ -1,188 +1,198 @@
-#include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
-#include "sensor_msgs/msg/joint_state.hpp"
+#include <chrono>
+#include <memory>
+#include <string>
 
+#include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/joint_state.hpp"
+#include "std_msgs/msg/string.hpp"
+
+#include "delta_robot.h"
+#include "joint_state_config.hpp"
 #include "my_delta_robot/msg/linear_speed_xyz.hpp"
 #include "my_delta_robot/msg/num_point.hpp"
 #include "my_delta_robot/msg/vmax_amax.hpp"
 
-#include "delta_robot.h"
-#include <memory>
+namespace {
 
-class MyNode: public rclcpp::Node {
-    int gripper;
-    std::unique_ptr<delta_robot> m_delta_robot;
+constexpr double kMinTrajectoryStepSec = 0.01;
+constexpr double kTrajectoryTimeScale = 10.0;
 
-    double position_value[13];
+}  // namespace
 
-    rclcpp::Rate loop_rate;
-    sensor_msgs::msg::JointState JointState;
-    my_delta_robot::msg::VmaxAmax vm_am;
-    std_msgs::msg::String msg;
-
-    std::shared_ptr<rclcpp::Subscription<my_delta_robot::msg::LinearSpeedXYZ>> receive_node_a;
-    std::shared_ptr<rclcpp::Subscription<my_delta_robot::msg::NumPoint>> set_num_point;
-    std::shared_ptr<rclcpp::Subscription<my_delta_robot::msg::VmaxAmax>> set_vmax_amax;
-
-    std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::JointState>> pub_for_rviz;
-    std::shared_ptr<rclcpp::Publisher<std_msgs::msg::String>> status_to_node_b;
-    std::shared_ptr<rclcpp::Publisher<my_delta_robot::msg::VmaxAmax>> v_a_out;
-
+class MainNode : public rclcpp::Node {
 public:
-    MyNode():Node("main_node"), loop_rate(7.8125) {
-        RCLCPP_INFO(this->get_logger(), "main_node is created");
+    MainNode()
+    : Node("main_node"),
+      position_value_{},
+      joint_state_(),
+      vm_am_(),
+      status_msg_(),
+      robot_(std::make_unique<delta_robot>()) {
+        using delta_robot_config::kActuatedJoints;
+        using delta_robot_config::kJointNames;
+        using delta_robot_config::kNumJoints;
 
-        receive_node_a = this->create_subscription<my_delta_robot::msg::LinearSpeedXYZ>("input_ls_final", 10, std::bind(&MyNode::callback_linear_speed_xyz, this, std::placeholders::_1));
-        set_num_point = this->create_subscription<my_delta_robot::msg::NumPoint>("set_num_point", 10, std::bind(&MyNode::set_num_point_callback, this, std::placeholders::_1));
-        set_vmax_amax = this->create_subscription<my_delta_robot::msg::VmaxAmax>("set_vmax_amax", 10, std::bind(&MyNode::set_vmax_amax_callback, this, std::placeholders::_1));
+        RCLCPP_INFO(get_logger(), "main_node started");
 
-        pub_for_rviz = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
-        status_to_node_b = this->create_publisher<std_msgs::msg::String>("status_delta", 10);
-        v_a_out = this->create_publisher<my_delta_robot::msg::VmaxAmax>("v_a_out", 10);
+        sub_linear_speed_ = create_subscription<my_delta_robot::msg::LinearSpeedXYZ>(
+            "input_ls_final", 10,
+            std::bind(&MainNode::onLinearSpeed, this, std::placeholders::_1));
+        sub_num_point_ = create_subscription<my_delta_robot::msg::NumPoint>(
+            "set_num_point", 10,
+            std::bind(&MainNode::onNumPoint, this, std::placeholders::_1));
+        sub_vmax_amax_ = create_subscription<my_delta_robot::msg::VmaxAmax>(
+            "set_vmax_amax", 10,
+            std::bind(&MainNode::onVmaxAmax, this, std::placeholders::_1));
 
-        JointState.header.frame_id = "";
-        JointState.name.resize(13);
-        JointState.position.resize(13);
-        JointState.name[0] = "base_brazo1";
-        JointState.name[1] = "base_brazo2";
-        JointState.name[2] = "base_brazo3";
-        JointState.name[3] = "codo1_a";
-        JointState.name[4] = "codo1_b";
-        JointState.name[5] = "codo2_a";
-        JointState.name[6] = "codo2_b";
-        JointState.name[7] = "codo3_a";
-        JointState.name[8] = "codo3_b";
-        JointState.name[9] = "act_x";
-        JointState.name[10] = "act_y";
-        JointState.name[11] = "act_z";
-        JointState.name[12] = "gripper";
+        pub_joint_states_ = create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
+        pub_status_ = create_publisher<std_msgs::msg::String>("status_delta", 10);
+        pub_v_a_out_ = create_publisher<my_delta_robot::msg::VmaxAmax>("v_a_out", 10);
 
-        m_delta_robot = std::make_unique<delta_robot>();
-        m_delta_robot->set_vmax_amax(1500, 200000);
-        m_delta_robot->set_resolution(120);
-        gripper = 0;
+        joint_state_.header.frame_id = "base_link";
+        joint_state_.name = kJointNames;
+        joint_state_.position.resize(kNumJoints, 0.0);
 
-        publish_initial_joint_state();
+        robot_->set_vmax_amax(1500, 200000);
+        robot_->set_resolution(120);
+
+        publishInitialJointState();
+
+        // Republish until robot_state_publisher is subscribed (avoids startup race)
+        startup_publish_count_ = 0;
+        startup_timer_ = create_wall_timer(
+            std::chrono::milliseconds(200),
+            std::bind(&MainNode::onStartupTimer, this));
     }
+
 private:
-    void callback_linear_speed_xyz(const my_delta_robot::msg::LinearSpeedXYZ::SharedPtr msg) {
-        m_delta_robot->mStartPoint.x = msg->xo;
-        m_delta_robot->mStartPoint.y = msg->yo;
-        m_delta_robot->mStartPoint.z = msg->zo;
-
-        m_delta_robot->mEndPoint.x = msg->xf;
-        m_delta_robot->mEndPoint.y = msg->yf;
-        m_delta_robot->mEndPoint.z = msg->zf;
-
-        gripper = msg->gripper;
-
-        if (m_delta_robot->mStartPoint != m_delta_robot->mEndPoint) {
-            main_func();
-        }
-        else {
-            std::cout << "Start point and end Point is duplicate" << std::endl;
+    void onStartupTimer() {
+        publishInitialJointState();
+        ++startup_publish_count_;
+        if (startup_publish_count_ >= 15) {
+            startup_timer_->cancel();
+            startup_timer_.reset();
         }
     }
 
-    /// @brief 
-    /// @param msg 
-    void set_num_point_callback(const my_delta_robot::msg::NumPoint::SharedPtr msg) {
-        if (msg->resolution > 0) {
-            m_delta_robot->set_resolution(msg->resolution);
-            std::cout << "set resolution = " << msg->resolution << std::endl;
+    void publishInitialJointState() {
+        using delta_robot_config::kInitialJointPositions;
+        using delta_robot_config::kNumJoints;
+
+        for (int i = 0; i < kNumJoints; ++i) {
+            joint_state_.position[i] = kInitialJointPositions[i];
         }
-        else {
-            std::cout << "ERROR to set resolution" << std::endl;
-        }
-    }
-    
-    /// @brief 
-    void publish_initial_joint_state() {
-        for (int j = 0; j < 12; j++) {
-            JointState.position[j] = 0.0;
-        }
-        JointState.position[0] = JointState.position[1] = JointState.position[2] = 0.000266;
-        JointState.position[3] = JointState.position[5] = JointState.position[7] = 0.9382;
-        JointState.position[4] = JointState.position[6] = JointState.position[8] = 0.0;
-        JointState.position[9] = JointState.position[10] = 0.0;
-        JointState.position[11] = -0.375;
-        JointState.position[12] = 0.0;
-        JointState.header.stamp = this->now();
-        pub_for_rviz->publish(JointState);
+        joint_state_.header.stamp = now();
+        pub_joint_states_->publish(joint_state_);
     }
 
-    void main_func() {
-        if (!rclcpp::ok()) return;
+    void onLinearSpeed(const my_delta_robot::msg::LinearSpeedXYZ::SharedPtr msg) {
+        robot_->mStartPoint.x = msg->xo;
+        robot_->mStartPoint.y = msg->yo;
+        robot_->mStartPoint.z = msg->zo;
+        robot_->mEndPoint.x = msg->xf;
+        robot_->mEndPoint.y = msg->yf;
+        robot_->mEndPoint.z = msg->zf;
+        if (robot_->mStartPoint == robot_->mEndPoint) {
+            RCLCPP_WARN(get_logger(), "Start and end points are identical; ignoring.");
+            return;
+        }
+        executeTrajectory();
+    }
 
-        m_delta_robot->system_linear();
-        m_delta_robot->TrapezoidalVelocityProfile();
-        m_delta_robot->system_linear_matrix();
+    void onNumPoint(const my_delta_robot::msg::NumPoint::SharedPtr msg) {
+        if (msg->resolution <= 0) {
+            RCLCPP_ERROR(get_logger(), "Invalid resolution: %lld", static_cast<long long>(msg->resolution));
+            return;
+        }
+        robot_->set_resolution(msg->resolution);
+        RCLCPP_INFO(get_logger(), "Resolution set to %lld", static_cast<long long>(msg->resolution));
+    }
 
-        if (m_delta_robot->m_data_delta.empty()) {
-            RCLCPP_WARN(this->get_logger(), "Trajectory produced no points; skipping.");
+    void onVmaxAmax(const my_delta_robot::msg::VmaxAmax::SharedPtr msg) {
+        robot_->set_vmax_amax(static_cast<unsigned int>(msg->vmax),
+                              static_cast<unsigned int>(msg->amax));
+        RCLCPP_INFO(get_logger(), "vmax=%.1f amax=%.1f", msg->vmax, msg->amax);
+    }
+
+    void executeTrajectory() {
+        if (!rclcpp::ok()) {
             return;
         }
 
-        RCLCPP_INFO(this->get_logger(), "Creating Linear Path RVIZ!");
+        robot_->system_linear();
+        robot_->TrapezoidalVelocityProfile();
+        robot_->system_linear_matrix();
 
-        double delta = 0;
-        vm_am.vmax = m_delta_robot->m_data_delta[0]->vel;
-        vm_am.amax = m_delta_robot->m_data_delta[0]->acel;
-        v_a_out->publish(vm_am);
+        if (robot_->m_data_delta.empty()) {
+            RCLCPP_WARN(get_logger(), "Trajectory produced no points; skipping.");
+            return;
+        }
 
-        for (size_t i = 1; i < m_delta_robot->m_data_delta.size(); i++) {
-            m_delta_robot->m_data_delta[i]->theta_val = m_delta_robot->inverse(m_delta_robot->m_data_delta[i]->position_val);
+        RCLCPP_INFO(get_logger(), "Publishing linear path to RViz");
 
-            m_delta_robot->create_joint_state_list(
-                m_delta_robot->m_data_delta[i]->position_val,
-                m_delta_robot->m_data_delta[i]->theta_val,
-                position_value
-            );
+        vm_am_.vmax = robot_->m_data_delta[0]->vel;
+        vm_am_.amax = robot_->m_data_delta[0]->acel;
+        pub_v_a_out_->publish(vm_am_);
 
-            delta = (m_delta_robot->m_data_delta[i]->time_point - m_delta_robot->m_data_delta[i - 1]->time_point) * 10;
-            if (delta <= 0.0) delta = 0.01;
+        for (size_t i = 1; i < robot_->m_data_delta.size(); ++i) {
+            const auto & sample = robot_->m_data_delta[i];
+            const auto & prev = robot_->m_data_delta[i - 1];
 
-            for (int j = 0; j < 12; j++) {
-                JointState.position[j] = position_value[j];
+            sample->theta_val = robot_->inverse(sample->position_val);
+            robot_->create_joint_state_list(
+                sample->position_val, sample->theta_val, position_value_);
+
+            double delta = (sample->time_point - prev->time_point) * kTrajectoryTimeScale;
+            if (delta <= 0.0) {
+                delta = kMinTrajectoryStepSec;
             }
-            JointState.position[12] = gripper;
-            JointState.header.stamp = this->now();
-            pub_for_rviz->publish(JointState);
 
-            vm_am.vmax = m_delta_robot->m_data_delta[i]->vel;
-            vm_am.amax = m_delta_robot->m_data_delta[i]->acel;
-            v_a_out->publish(vm_am);
+            for (int j = 0; j < delta_robot_config::kNumJoints; ++j) {
+                joint_state_.position[j] = position_value_[j];
+            }
+            joint_state_.header.stamp = now();
+            pub_joint_states_->publish(joint_state_);
+
+            vm_am_.vmax = sample->vel;
+            vm_am_.amax = sample->acel;
+            pub_v_a_out_->publish(vm_am_);
 
             rclcpp::Rate rate(1.0 / delta);
             rate.sleep();
         }
 
-        msg.data = "(" + std::to_string(m_delta_robot->mStartPoint.x) + ", "
-                    + std::to_string(m_delta_robot->mStartPoint.y) + ", "
-                    + std::to_string(m_delta_robot->mStartPoint.z) + ") -> ("
-                    + std::to_string(m_delta_robot->mEndPoint.x) + ", "
-                    + std::to_string(m_delta_robot->mEndPoint.y) + ", "
-                    + std::to_string(m_delta_robot->mEndPoint.z) + ") DONE";
-        status_to_node_b->publish(msg);
+        status_msg_.data =
+            "(" + std::to_string(robot_->mStartPoint.x) + ", "
+            + std::to_string(robot_->mStartPoint.y) + ", "
+            + std::to_string(robot_->mStartPoint.z) + ") -> ("
+            + std::to_string(robot_->mEndPoint.x) + ", "
+            + std::to_string(robot_->mEndPoint.y) + ", "
+            + std::to_string(robot_->mEndPoint.z) + ") DONE";
+        pub_status_->publish(status_msg_);
     }
 
-    /// @brief 
-    /// @param msg 
-    void set_vmax_amax_callback(const my_delta_robot::msg::VmaxAmax::SharedPtr msg) {
-        m_delta_robot->set_vmax_amax(msg->vmax, msg->amax);
-        std::cout << "set vmax = " << msg->vmax << ", and set amax = " << msg->amax << std::endl;
-    }
+    double position_value_[12];
+
+    sensor_msgs::msg::JointState joint_state_;
+    my_delta_robot::msg::VmaxAmax vm_am_;
+    std_msgs::msg::String status_msg_;
+    std::unique_ptr<delta_robot> robot_;
+
+    int startup_publish_count_{0};
+    rclcpp::TimerBase::SharedPtr startup_timer_;
+
+    rclcpp::Subscription<my_delta_robot::msg::LinearSpeedXYZ>::SharedPtr sub_linear_speed_;
+    rclcpp::Subscription<my_delta_robot::msg::NumPoint>::SharedPtr sub_num_point_;
+    rclcpp::Subscription<my_delta_robot::msg::VmaxAmax>::SharedPtr sub_vmax_amax_;
+
+    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr pub_joint_states_;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_status_;
+    rclcpp::Publisher<my_delta_robot::msg::VmaxAmax>::SharedPtr pub_v_a_out_;
 };
 
-/// @brief 
-/// @param argc 
-/// @param argv 
-/// @return 
-int main(int argc, char **argv) {
+int main(int argc, char ** argv) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<MyNode>();
-
-    rclcpp::spin(node);
+    rclcpp::spin(std::make_shared<MainNode>());
     rclcpp::shutdown();
     return 0;
 }
