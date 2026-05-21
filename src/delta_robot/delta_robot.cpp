@@ -59,7 +59,22 @@ Point delta_robot::unit_vector(Point point0, Point pointf) {
 /// @param theta_z 
 /// @param rot_tras 
 void delta_robot::system_linear(void) {
-    initialize();
+    m_data_delta.clear();
+    for (auto& row : rot_z) {
+        for (double& value : row) {
+            value = 0.0;
+        }
+    }
+    for (auto& row : rot_y) {
+        for (double& value : row) {
+            value = 0.0;
+        }
+    }
+    for (auto& row : rot_tras) {
+        for (double& value : row) {
+            value = 0.0;
+        }
+    }
 
     double xoo = mStartPoint.x * mmtm;
     double yoo = mStartPoint.y * mmtm;
@@ -209,80 +224,34 @@ void delta_robot::angle_rotation(Point unit_vector) {
 /// @brief 
 /// @param  
 void delta_robot::TrapezoidalVelocityProfile(void) {
-    try {
-        double q0 = 0; // start from zero
-        q0 *= mmtm;
-        dis *= mmtm;
-        vmax *= mmtm;
-        amax *= mmtm;
-
-        if (mResolution <= 0) mResolution = 2;
-
-        double tau = vmax / amax;
-
-        double T = 0;
-        if ((this->dis - q0) > 0) {
-            T = (this->dis - q0) / vmax + tau;
-        }
-        else if ((this->dis - q0) < 0) {
-            T = (q0 - this->dis) / vmax + tau;
-        }
-
-        double paso1 = tau / mResolution;
-        double paso2 = (T - (2 * tau)) / mResolution;
-        unsigned int pas_total = mResolution + mResolution + mResolution;
-
-        double Tf = 2 * (std::sqrt((this->dis - q0) / (amax)));
-        double vmax_acel = amax * (Tf / 2);
-
-        if (vmax_acel <= vmax) {
-            vmax = vmax_acel;
-            tau = Tf / 2;
-            T = Tf;
-            paso1 = tau / mResolution;
-            paso2 = 0;
-            mResolution = 0;
-            pas_total = mResolution + mResolution + mResolution;
-        }
-
-        for (unsigned int i = 0; i < pas_total; i++) {
-            auto data = std::make_unique<data_delta_t>();
-            data->pos = 0;
-            data->position_val.init();
-            data->theta_val.init();
-            data->acel = 0;
-            data->vel = 0;
-            data->time_point = 0;
-            m_data_delta.push_back(std::move(data));
-        }
-
-        double ti = -1 * paso1;
-        double q_actual, v_actual, a_actual;
-
-        for (unsigned int i = 0; i < pas_total; i++) {
-            if (i < mResolution) {
-                ti += paso1;
-            }
-            else if (i < (mResolution + mResolution)) {
-                ti += paso2;
-            }
-            else if (i < pas_total) {
-                ti += paso1;
-            }
-            else {
-                ti = T;
-            }
-
-            ls_v_a_puntual(q0, dis, ti, q_actual, v_actual, a_actual);
-            m_data_delta[i]->pos = q_actual;
-            m_data_delta[i]->vel = v_actual;
-            m_data_delta[i]->acel = a_actual;
-            m_data_delta[i]->time_point = ti;
-            // cout << "dis=" << q_actual << ", v=" << v_actual << ", a_actual=" << a_actual << ", time_point=" << ti << endl;
-        }
+    m_data_delta.clear();
+    if (mResolution == 0 || dis <= 0.0 || vmax <= 0.0 || amax <= 0.0) {
+        return;
     }
-    catch(const std::exception& e) {
-        std::cerr << e.what() << '\n';
+
+    const double distance_m = dis * mmtm;
+    const auto limits = motion_limits();
+    const double sample_period_s =
+        std::max(0.001, distance_m / static_cast<double>(mResolution) / limits.max_velocity_mps);
+
+    Point start;
+    Point target(distance_m, 0.0, 0.0);
+    delta_motion::CartesianTrajectoryGenerator generator;
+    const auto plan = generator.planLine(start, target, limits, sample_period_s);
+    if (!plan.ok) {
+        return;
+    }
+
+    m_data_delta.reserve(plan.samples.size());
+    for (const auto& sample : plan.samples) {
+        auto data = std::make_unique<data_delta_t>();
+        data->pos = sample.path_position_m;
+        data->position_val.init();
+        data->theta_val.init();
+        data->acel = sample.path_acceleration_mps2;
+        data->vel = sample.path_velocity_mps;
+        data->time_point = sample.time_s;
+        m_data_delta.push_back(std::move(data));
     }
 }
 
@@ -384,7 +353,6 @@ void delta_robot::system_linear_matrix(void) {
 /// @param m_trans 
 /// @param xyz_res 
 void delta_robot::system_linear_invese(double xprima, double (&xyz_res)[4]) {
-    double rot_tras_invese[4][4] = {};
     double pf_invese[3] = {};
     double pf_trans_invese[4] = {};
     double m_trans_invese[4][4] = {};
@@ -407,7 +375,7 @@ void delta_robot::system_linear_invese(double xprima, double (&xyz_res)[4]) {
         }
     }
     // ######   Rotacion Z  ######
-    double rot_z_tras[3][3] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    double rot_z_tras[3][3] = {};
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
             rot_z_tras[j][i] = rot_z[i][j];
@@ -485,30 +453,51 @@ void delta_robot::set_resolution(unsigned int resolution) {
     this->mResolution = resolution;
 }
 
+delta_motion::MotionLimits delta_robot::motion_limits() const {
+    return {vmax * mmtm, amax * mmtm};
+}
+
+unsigned int delta_robot::resolution() const {
+    return mResolution;
+}
+
 /// @brief 
 /// @param mStartPoint 
 /// @return 
 Theta delta_robot::inverse(Point point) {
+    return inverse_checked(point).theta;
+}
+
+delta_robot::IkResult delta_robot::inverse_checked(Point point) {
+    IkResult result;
     Theta theta;
     Point point_temp;
 
     // Rotacion(0, 120, 240)
-    theta.angle2 = angle_yz(point);
+    if (!angle_yz(point, theta.angle2)) {
+        result.error = "IK failed for arm 2";
+        return result;
+    }
 
     point_temp.x = point.x * cos120 + point.y * sin120;
     point_temp.y = point.y * cos120 - point.x * sin120;
     point_temp.z = point.z;
-    theta.angle3 = angle_yz(point_temp); // rotate  to +119 deg
+    if (!angle_yz(point_temp, theta.angle3)) {
+        result.error = "IK failed for arm 3";
+        return result;
+    }
 
     point_temp.x = point.x * cos120 - point.y * sin120;
     point_temp.y = point.y * cos120 + point.x * sin120;
     point_temp.z = point.z;
-    theta.angle1 = angle_yz(point_temp); // rotate to -120 deg
+    if (!angle_yz(point_temp, theta.angle1)) {
+        result.error = "IK failed for arm 1";
+        return result;
+    }
 
-    // cout << "Point=(" << point_temp.x << ", " << point_temp.y << ", " << point_temp.z ;
-    // cout << ") -> Thetal=(" << theta.angle1 << ", " << theta.angle2 << ", " << theta.angle3 << ")" << endl;
-    
-    return theta;
+    result.ok = true;
+    result.theta = theta;
+    return result;
 }
 
 /// @brief 
@@ -518,10 +507,21 @@ Theta delta_robot::inverse(Point point) {
 /// @param theta 
 /// @return 
 double delta_robot::angle_yz(Point point) {
-    double theta = 0;
+    double theta = 0.0;
+    if (!angle_yz(point, theta)) {
+        return 1.0;
+    }
+    return theta;
+}
+
+bool delta_robot::angle_yz(Point point, double& theta) {
+    theta = 0.0;
 
     double y1 = -0.5 * tan30 * ff * mmtm;
     point.y = point.y - 0.5 * tan30 * ee * mmtm;
+    if (std::abs(point.z) < 1e-9) {
+        return false;
+    }
     // z = a + b * y
     double a = (point.x * point.x + point.y * point.y + point.z * point.z + rf * mmtm * rf * mmtm - re * mmtm * re * mmtm - y1 * y1) / (2.0 * point.z);
     double b = (y1 - point.y) / point.z;
@@ -531,8 +531,7 @@ double delta_robot::angle_yz(Point point) {
     double d = ((-1) * (a + b * y1) * (a + b * y1)) + (rf * mmtm * rf * mmtm * (b * b + 1.0));
 
     if (d < 0) {
-        std::cout << "discriminante - angle_yz" << std::endl;
-        return 1; // error inversa
+        return false;
     }
 
     double yj = ((y1 - a * b) - std::sqrt(d)) / (b * b + 1.0);
@@ -563,7 +562,7 @@ double delta_robot::angle_yz(Point point) {
         }
     }
 
-    return theta;
+    return std::isfinite(theta);
 }
 
 /// @brief 

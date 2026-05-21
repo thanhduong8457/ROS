@@ -3,6 +3,7 @@
  */
 #include <gtest/gtest.h>
 #include "delta_robot.h"
+#include "motion_planner.hpp"
 #include <cmath>
 
 #ifndef M_PI
@@ -21,6 +22,16 @@ TEST(DeltaRobot, InverseAtOrigin) {
   EXPECT_FALSE(std::isnan(theta.angle1));
   EXPECT_FALSE(std::isnan(theta.angle2));
   EXPECT_FALSE(std::isnan(theta.angle3));
+}
+
+TEST(DeltaRobot, CheckedInverseRejectsInvalidPoint) {
+  delta_robot robot;
+  Point p;
+  p.x = 0.0;
+  p.y = 0.0;
+  p.z = 0.0;
+  auto result = robot.inverse_checked(p);
+  EXPECT_FALSE(result.ok);
 }
 
 TEST(DeltaRobot, ActuatorJointsAtHomePose) {
@@ -54,4 +65,38 @@ TEST(DeltaRobot, SetVmaxAmax) {
   robot.TrapezoidalVelocityProfile();
   robot.system_linear_matrix();
   EXPECT_GT(robot.m_data_delta.size(), 0u);
+}
+
+TEST(CartesianTrajectory, SamplesStraightLineWithTrapezoidState) {
+  delta_motion::CartesianTrajectoryGenerator generator;
+  delta_motion::MotionLimits limits;
+  limits.max_velocity_mps = 0.5;
+  limits.max_acceleration_mps2 = 5.0;
+
+  Point start(0.0, 0.0, -0.375);
+  Point target(0.05, 0.025, -0.425);
+  auto plan = generator.planLine(start, target, limits, 0.001);
+
+  ASSERT_TRUE(plan.ok) << plan.error;
+  ASSERT_GT(plan.samples.size(), 2u);
+  EXPECT_NEAR(plan.samples.front().position_m.x, start.x, 1e-9);
+  EXPECT_NEAR(plan.samples.front().position_m.y, start.y, 1e-9);
+  EXPECT_NEAR(plan.samples.front().position_m.z, start.z, 1e-9);
+  EXPECT_NEAR(plan.samples.back().position_m.x, target.x, 1e-9);
+  EXPECT_NEAR(plan.samples.back().position_m.y, target.y, 1e-9);
+  EXPECT_NEAR(plan.samples.back().position_m.z, target.z, 1e-9);
+  EXPECT_NEAR(plan.samples.back().path_velocity_mps, 0.0, 1e-9);
+
+  const double dx = target.x - start.x;
+  const double dy = target.y - start.y;
+  const double dz = target.z - start.z;
+  const double distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+  for (const auto& sample : plan.samples) {
+    const double s = sample.path_position_m / distance;
+    EXPECT_NEAR(sample.position_m.x, start.x + dx * s, 1e-8);
+    EXPECT_NEAR(sample.position_m.y, start.y + dy * s, 1e-8);
+    EXPECT_NEAR(sample.position_m.z, start.z + dz * s, 1e-8);
+    EXPECT_LE(std::abs(sample.path_velocity_mps), limits.max_velocity_mps + 1e-9);
+  }
 }

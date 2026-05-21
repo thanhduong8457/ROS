@@ -1,11 +1,12 @@
 # my_delta_robot
 
-ROS 2 package for a delta parallel robot: inverse kinematics, trapezoidal velocity profiles, trajectory publishing to RViz, and draw/waypoint sequencing.
+ROS 2 package for a delta parallel robot: Cartesian straight-line trajectory planning, trapezoidal velocity profiles, inverse kinematics, trajectory publishing to RViz, and draw/waypoint sequencing.
 
 ## Features
 
-- **Kinematics library** (`delta_robot/`): IK, linear paths, trapezoidal velocity profiles
-- **main_node**: Subscribes to motion commands, publishes `/joint_states` and trajectory status
+- **Cartesian motion planner** (`delta_robot/motion_planner.hpp`): straight-line TCP interpolation with trapezoidal/triangular velocity profiles
+- **Kinematics library** (`delta_robot/`): delta inverse kinematics, checked IK result reporting, RViz joint mapping
+- **main_node**: Subscribes to motion commands, validates Cartesian trajectory samples through IK, publishes `/joint_states` from a 1 kHz timer
 - **draw_node**: Queues waypoints and publishes segments to `main_node`
 - **Visualization**: URDF, `robot_state_publisher`, RViz2 config
 
@@ -54,19 +55,71 @@ ros2 run my_delta_robot initial_pose_publisher.py
 
 ## Architecture
 
-```
-draw_node  --input_ls_final-->  main_node  --joint_states-->  robot_state_publisher / RViz
-              ^                      |
-              |                      v
-         status_delta  <----  (trajectory done)
+```text
+Target TCP position (x, y, z) [mm]
+        |
+        v
+draw_node waypoint sequencing
+        |
+        v
+main_node motion state machine
+        |
+        v
+CartesianTrajectoryGenerator
+  - line interpolation in Cartesian space
+  - trapezoidal or triangular velocity profile
+  - fixed 1 ms sample period
+        |
+        v
+Delta inverse kinematics
+  - per-sample workspace validation
+  - checked IK result
+        |
+        v
+RViz joint mapping / future joint controller
+        |
+        v
+/joint_states
 ```
 
 | Node | Role |
 |------|------|
-| `main_node` | IK + trajectory → `/joint_states`, `/status_delta` |
+| `main_node` | Non-blocking 1 kHz motion state machine → `/joint_states`, `/status_delta` |
 | `draw_node` | Waypoint queue → `/input_ls_final` |
 | `robot_state_publisher` | URDF → TF |
 | `rviz2` | Visualization |
+
+### Motion-control pipeline
+
+The current runtime path plans motion in Cartesian space before IK:
+
+```text
+Target Position
+  -> Cartesian Motion Planner
+  -> Trapezoidal/triangular trajectory generator
+  -> Interpolated Cartesian TCP samples
+  -> Delta inverse kinematics
+  -> Joint-state output
+```
+
+This preserves straight-line TCP motion. Velocity and acceleration are applied to scalar path distance `s(t)`, then projected back onto XYZ:
+
+```text
+p(t) = p0 + direction * s(t)
+v(t) = direction * ds/dt
+a(t) = direction * d2s/dt2
+```
+
+`main_node` no longer sleeps inside the command callback. A motion command is planned and IK-validated first, then samples are published by a 1 ms ROS timer. This is suitable for simulation and architecture validation. For real DRV8825/NEMA23 hardware, the next layer should be an embedded joint/step scheduler:
+
+```text
+Joint target angles
+  -> synchronized joint step counts
+  -> per-axis step-rate scheduling
+  -> hardware timer ISR or DMA pulse generation
+```
+
+The ISR/DMA layer is intentionally not implemented in this ROS package yet. The ROS node is the planning and visualization side of the pipeline.
 
 Legacy sources (not built by default): `node_a.cpp`, `node_b.cpp`, `serial_module.cpp`.
 
@@ -76,7 +129,7 @@ Legacy sources (not built by default): `node_a.cpp`, `node_b.cpp`, `serial_modul
 |-------|------|-------------|
 | `/input_ls_final` | `my_delta_robot/msg/LinearSpeedXYZ` | Line segment (start → end), mm |
 | `/set_current_point` | `my_delta_robot/msg/Posicionxyz` | Configure pose / draw modes |
-| `/set_num_point` | `my_delta_robot/msg/NumPoint` | Trajectory resolution |
+| `/set_num_point` | `my_delta_robot/msg/NumPoint` | Legacy offline trajectory resolution; runtime planner uses fixed 1 kHz sampling |
 | `/set_vmax_amax` | `my_delta_robot/msg/VmaxAmax` | Velocity limits |
 | `/joint_states` | `sensor_msgs/msg/JointState` | Robot visualization |
 | `/status_delta` | `std_msgs/msg/String` | Motion complete |
@@ -125,6 +178,8 @@ colcon test-result --verbose
 ```
 src/
 ├── delta_robot/          # IK + motion library
+│   ├── motion_planner.hpp # Cartesian line + trapezoid trajectory generator
+│   ├── delta_robot.h/.cpp # Delta IK and RViz joint mapping
 ├── src/                  # main_node, draw_node
 ├── msg/                  # Custom messages
 ├── urdf/                 # delta_robot.urdf
@@ -138,6 +193,8 @@ src/
 
 - Stepper drivers: DRV8825 ×3, NEMA 23
 - Serial bridge: `serial_module.cpp` (enable in `CMakeLists.txt` when hardware is connected)
+- Current built runtime publishes synchronized trajectory samples as ROS joint states.
+- MCU-side work still needed for physical motion: joint synchronization in steps, acceleration-limited step scheduling, hardware timer pulse generation, and optional future DMA/closed-loop feedback.
 
 ## References
 

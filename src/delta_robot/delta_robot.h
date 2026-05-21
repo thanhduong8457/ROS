@@ -2,7 +2,9 @@
 #define __DELTA_ROBOT__
 
 #include "common.h"
+#include "motion_planner.hpp"
 #include <memory>
+#include <string>
 
 class delta_robot{
 private:
@@ -18,6 +20,7 @@ private:
     Point unit_vector(Point point0, Point pointf);
     void angle_rotation(Point unit_vector);
     // double delta_calcAngleYZ(double x0, double y0, double z0);
+    bool angle_yz(Point point0, double& theta_deg);
     double angle_yz(Point point0);
     void system_linear_invese(double xprima, double(&xyz_res)[4]);
 
@@ -30,6 +33,12 @@ private:
     void rotation_y(double ent[3], double ang, double(&sal)[3]);
 
 public:
+    struct IkResult {
+        bool ok{false};
+        Theta theta;
+        std::string error;
+    };
+
     double rot_z[3][3];
     double rot_y[3][3];
     double rot_tras[4][4];
@@ -46,6 +55,7 @@ public:
     void initialize(void);
 
     Theta inverse(Point point0);
+    IkResult inverse_checked(Point point0);
 
     void TrapezoidalVelocityProfile(void);
     void ls_v_a_puntual(double q0, double q1, double tactual, double &q_actual, double &v_actual, double &a_actual);
@@ -57,5 +67,7 @@ public:
 
     void set_vmax_amax(unsigned int vmax, unsigned int amax);
     void set_resolution(unsigned int resolution);
+    delta_motion::MotionLimits motion_limits() const;
+    unsigned int resolution() const;
 };
 #endif

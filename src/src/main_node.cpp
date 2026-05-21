@@ -1,6 +1,7 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
@@ -8,14 +9,15 @@
 
 #include "delta_robot.h"
 #include "joint_state_config.hpp"
+#include "motion_planner.hpp"
 #include "my_delta_robot/msg/linear_speed_xyz.hpp"
 #include "my_delta_robot/msg/num_point.hpp"
 #include "my_delta_robot/msg/vmax_amax.hpp"
 
 namespace {
 
-constexpr double kMinTrajectoryStepSec = 0.01;
-constexpr double kTrajectoryTimeScale = 10.0;
+constexpr auto kMotionTick = std::chrono::milliseconds(1);
+constexpr double kMotionSamplePeriodSec = 0.001;
 
 }  // namespace
 
@@ -28,7 +30,6 @@ public:
       vm_am_(),
       status_msg_(),
       robot_(std::make_unique<delta_robot>()) {
-        using delta_robot_config::kActuatedJoints;
         using delta_robot_config::kJointNames;
         using delta_robot_config::kNumJoints;
 
@@ -62,6 +63,10 @@ public:
         startup_timer_ = create_wall_timer(
             std::chrono::milliseconds(200),
             std::bind(&MainNode::onStartupTimer, this));
+
+        motion_timer_ = create_wall_timer(
+            kMotionTick,
+            std::bind(&MainNode::onMotionTimer, this));
     }
 
 private:
@@ -86,17 +91,18 @@ private:
     }
 
     void onLinearSpeed(const my_delta_robot::msg::LinearSpeedXYZ::SharedPtr msg) {
-        robot_->mStartPoint.x = msg->xo;
-        robot_->mStartPoint.y = msg->yo;
-        robot_->mStartPoint.z = msg->zo;
-        robot_->mEndPoint.x = msg->xf;
-        robot_->mEndPoint.y = msg->yf;
-        robot_->mEndPoint.z = msg->zf;
-        if (robot_->mStartPoint == robot_->mEndPoint) {
+        if (motion_active_) {
+            RCLCPP_WARN(get_logger(), "Motion already active; rejecting new command.");
+            return;
+        }
+
+        commanded_start_mm_ = Point(msg->xo, msg->yo, msg->zo);
+        commanded_target_mm_ = Point(msg->xf, msg->yf, msg->zf);
+        if (commanded_start_mm_ == commanded_target_mm_) {
             RCLCPP_WARN(get_logger(), "Start and end points are identical; ignoring.");
             return;
         }
-        executeTrajectory();
+        startTrajectory(commanded_start_mm_, commanded_target_mm_);
     }
 
     void onNumPoint(const my_delta_robot::msg::NumPoint::SharedPtr msg) {
@@ -104,8 +110,11 @@ private:
             RCLCPP_ERROR(get_logger(), "Invalid resolution: %lld", static_cast<long long>(msg->resolution));
             return;
         }
-        robot_->set_resolution(msg->resolution);
-        RCLCPP_INFO(get_logger(), "Resolution set to %lld", static_cast<long long>(msg->resolution));
+        robot_->set_resolution(static_cast<unsigned int>(msg->resolution));
+        RCLCPP_INFO(
+            get_logger(),
+            "Legacy offline resolution set to %lld; runtime planner remains fixed at 1 kHz.",
+            static_cast<long long>(msg->resolution));
     }
 
     void onVmaxAmax(const my_delta_robot::msg::VmaxAmax::SharedPtr msg) {
@@ -114,61 +123,82 @@ private:
         RCLCPP_INFO(get_logger(), "vmax=%.1f amax=%.1f", msg->vmax, msg->amax);
     }
 
-    void executeTrajectory() {
-        if (!rclcpp::ok()) {
+    void startTrajectory(const Point& start_mm, const Point& target_mm) {
+        Point start_m(start_mm.x * mmtm, start_mm.y * mmtm, start_mm.z * mmtm);
+        Point target_m(target_mm.x * mmtm, target_mm.y * mmtm, target_mm.z * mmtm);
+
+        delta_motion::CartesianTrajectoryGenerator generator;
+        auto plan = generator.planLine(
+            start_m, target_m, robot_->motion_limits(), kMotionSamplePeriodSec);
+        if (!plan.ok) {
+            RCLCPP_ERROR(get_logger(), "Trajectory rejected: %s", plan.error.c_str());
             return;
         }
 
-        robot_->system_linear();
-        robot_->TrapezoidalVelocityProfile();
-        robot_->system_linear_matrix();
+        for (const auto& sample : plan.samples) {
+            const auto ik = robot_->inverse_checked(sample.position_m);
+            if (!ik.ok) {
+                RCLCPP_ERROR(
+                    get_logger(),
+                    "Trajectory rejected at t=%.4f s: %s",
+                    sample.time_s,
+                    ik.error.c_str());
+                return;
+            }
+        }
 
-        if (robot_->m_data_delta.empty()) {
-            RCLCPP_WARN(get_logger(), "Trajectory produced no points; skipping.");
+        active_samples_ = std::move(plan.samples);
+        active_sample_index_ = 0;
+        motion_active_ = true;
+
+        RCLCPP_INFO(
+            get_logger(),
+            "Started Cartesian line: %zu samples, %.4f s",
+            active_samples_.size(),
+            active_samples_.back().time_s);
+    }
+
+    void onMotionTimer() {
+        if (!motion_active_ || active_sample_index_ >= active_samples_.size()) {
             return;
         }
 
-        RCLCPP_INFO(get_logger(), "Publishing linear path to RViz");
+        const auto& sample = active_samples_[active_sample_index_];
+        const auto ik = robot_->inverse_checked(sample.position_m);
+        if (!ik.ok) {
+            RCLCPP_ERROR(get_logger(), "IK failed during motion: %s", ik.error.c_str());
+            motion_active_ = false;
+            active_samples_.clear();
+            return;
+        }
 
-        vm_am_.vmax = robot_->m_data_delta[0]->vel;
-        vm_am_.amax = robot_->m_data_delta[0]->acel;
+        robot_->create_joint_state_list(sample.position_m, ik.theta, position_value_);
+
+        for (int j = 0; j < delta_robot_config::kNumJoints; ++j) {
+            joint_state_.position[j] = position_value_[j];
+        }
+        joint_state_.header.stamp = now();
+        pub_joint_states_->publish(joint_state_);
+
+        vm_am_.vmax = sample.path_velocity_mps;
+        vm_am_.amax = sample.path_acceleration_mps2;
         pub_v_a_out_->publish(vm_am_);
 
-        for (size_t i = 1; i < robot_->m_data_delta.size(); ++i) {
-            const auto & sample = robot_->m_data_delta[i];
-            const auto & prev = robot_->m_data_delta[i - 1];
-
-            sample->theta_val = robot_->inverse(sample->position_val);
-            robot_->create_joint_state_list(
-                sample->position_val, sample->theta_val, position_value_);
-
-            double delta = (sample->time_point - prev->time_point) * kTrajectoryTimeScale;
-            if (delta <= 0.0) {
-                delta = kMinTrajectoryStepSec;
-            }
-
-            for (int j = 0; j < delta_robot_config::kNumJoints; ++j) {
-                joint_state_.position[j] = position_value_[j];
-            }
-            joint_state_.header.stamp = now();
-            pub_joint_states_->publish(joint_state_);
-
-            vm_am_.vmax = sample->vel;
-            vm_am_.amax = sample->acel;
-            pub_v_a_out_->publish(vm_am_);
-
-            rclcpp::Rate rate(1.0 / delta);
-            rate.sleep();
+        ++active_sample_index_;
+        if (active_sample_index_ < active_samples_.size()) {
+            return;
         }
 
         status_msg_.data =
-            "(" + std::to_string(robot_->mStartPoint.x) + ", "
-            + std::to_string(robot_->mStartPoint.y) + ", "
-            + std::to_string(robot_->mStartPoint.z) + ") -> ("
-            + std::to_string(robot_->mEndPoint.x) + ", "
-            + std::to_string(robot_->mEndPoint.y) + ", "
-            + std::to_string(robot_->mEndPoint.z) + ") DONE";
+            "(" + std::to_string(commanded_start_mm_.x) + ", "
+            + std::to_string(commanded_start_mm_.y) + ", "
+            + std::to_string(commanded_start_mm_.z) + ") -> ("
+            + std::to_string(commanded_target_mm_.x) + ", "
+            + std::to_string(commanded_target_mm_.y) + ", "
+            + std::to_string(commanded_target_mm_.z) + ") DONE";
         pub_status_->publish(status_msg_);
+        motion_active_ = false;
+        active_samples_.clear();
     }
 
     double position_value_[12];
@@ -180,6 +210,13 @@ private:
 
     int startup_publish_count_{0};
     rclcpp::TimerBase::SharedPtr startup_timer_;
+    rclcpp::TimerBase::SharedPtr motion_timer_;
+
+    bool motion_active_{false};
+    size_t active_sample_index_{0};
+    Point commanded_start_mm_;
+    Point commanded_target_mm_;
+    std::vector<delta_motion::TrajectorySample> active_samples_;
 
     rclcpp::Subscription<my_delta_robot::msg::LinearSpeedXYZ>::SharedPtr sub_linear_speed_;
     rclcpp::Subscription<my_delta_robot::msg::NumPoint>::SharedPtr sub_num_point_;
