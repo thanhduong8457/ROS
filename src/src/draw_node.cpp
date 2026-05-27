@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -26,10 +28,13 @@ enum SetPointType : int {
     kZStartEnd,
     kDrawSquare,
     kDrawTriangle,
+    kDrawCircle,
 };
 
 constexpr double kDefaultZMin = -480.0;
 constexpr double kDefaultZMax = -375.0;
+constexpr double kDefaultCircleRadiusMm = 25.0;
+constexpr int kCircleSegments = 24;
 
 }  // namespace
 
@@ -248,11 +253,15 @@ private:
                 break;
 
             case kDrawSquare:
-                queueSquarePath();
+                queueRectanglePath();
                 break;
 
             case kDrawTriangle:
                 queueTrianglePath();
+                break;
+
+            case kDrawCircle:
+                queueCirclePath();
                 break;
 
             default:
@@ -266,13 +275,29 @@ private:
         }
     }
 
-    void queueSquarePath() {
-        RCLCPP_INFO(get_logger(), "Queueing square draw path");
+    void queueRectanglePath() {
+        RCLCPP_INFO(get_logger(), "Queueing rectangle draw path");
         enqueuePoint(square_corners_[0].x, square_corners_[0].y, square_corners_[0].z - z_start_);
         enqueuePoint(square_corners_[1].x, square_corners_[1].y, square_corners_[1].z - z_start_);
         enqueuePoint(square_corners_[2].x, square_corners_[2].y, square_corners_[2].z - z_start_);
         enqueuePoint(square_corners_[3].x, square_corners_[3].y, square_corners_[3].z - z_start_);
         enqueuePoint(square_corners_[0].x, square_corners_[0].y, square_corners_[0].z - z_start_);
+        enqueuePoint(current_point_.x, current_point_.y, current_point_.z);
+    }
+
+    void queueCirclePath() {
+        RCLCPP_INFO(get_logger(), "Queueing circle draw path");
+
+        const double radius = std::max(kDefaultCircleRadiusMm, std::abs(z_end_));
+        const double draw_z = circle_point_.z - z_start_;
+
+        for (int i = 0; i <= kCircleSegments; ++i) {
+            const double angle = (2.0 * pi * static_cast<double>(i)) / kCircleSegments;
+            enqueuePoint(
+                circle_point_.x + radius * std::cos(angle),
+                circle_point_.y + radius * std::sin(angle),
+                draw_z);
+        }
         enqueuePoint(current_point_.x, current_point_.y, current_point_.z);
     }
 

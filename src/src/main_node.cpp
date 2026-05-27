@@ -53,7 +53,7 @@ public:
         joint_state_.name = kJointNames;
         joint_state_.position.resize(kNumJoints, 0.0);
 
-        robot_->set_vmax_amax(1500, 200000);
+        robot_->set_vmax_amax(5000, 100);
         robot_->set_resolution(120);
 
         publishInitialJointState();

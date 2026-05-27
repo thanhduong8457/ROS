@@ -159,7 +159,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <cylinder length="0.02" radius="0.012"/>
+        <cylinder length="0.002" radius="0.03"/>
       </geometry>
       <material name="colorte"/>
     </visual>

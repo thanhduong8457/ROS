@@ -50,6 +50,8 @@ install(TARGETS main_node draw_node
 
 install(PROGRAMS
   python_scripts/initial_pose_publisher.py
+  python_scripts/gui_user_interface_node.py
+  python_scripts/user_interface_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -25,8 +25,8 @@ void delta_robot::initialize(void) {
     A3[0] = A2[0];
     A3[1] = -A2[1];
     A3[2] = 0;
-    this->vmax = 1500;
-    this->amax = 200000;
+    this->vmax = 5000;
+    this->amax = 100;
     this->mResolution = 120;
     m_data_delta.clear();
 }
