@@ -78,6 +78,9 @@ Both values must be numeric and positive before a drawing command can be sent.
 
 The user interface nodes reuse the existing topic-based command style.
 
+Architecture diagrams and sequence flows are available in
+[docs/software_architecture.md](docs/software_architecture.md).
+
 | Publisher | Topic | Message | Receiver | Purpose |
 |-----------|-------|---------|----------|---------|
 | GUI or terminal UI | `/set_vmax_amax` | `my_delta_robot/msg/VmaxAmax` | `main_node` | Update velocity and acceleration limits |
