@@ -9,7 +9,8 @@ For a current project-level summary, status, known gaps, and recommended next st
 - `main_node`: validates line-segment commands, plans Cartesian trajectories, preflights IK, follows planned elapsed time, and publishes `/joint_states`.
 - `draw_node`: generates drawing paths and executes them through a protected sequential waypoint queue; circles use one continuous 1 kHz trajectory without stops between polygon edges.
 - Reusable validation and shape-generation helpers in `src/delta_robot/` keep ROS callbacks small and core behavior testable.
-- `gui_user_interface_node.py`: Tkinter GUI for setting `vmax`, `amax`, and the target drawing action.
+- `gui_user_interface_node.py`: operator control panel with live TCP feedback,
+  motion presets, one-click shapes, direct Cartesian targets, and incremental jog controls.
 - `user_interface_node.py`: legacy terminal UI that publishes the same command topics as the GUI.
 - Custom ROS 2 messages in `msg/`.
 - URDF, RViz config, and launch files for visualization.
@@ -46,13 +47,19 @@ source install/setup.zsh
 
 ## Run
 
-Launch the robot model, RViz, `main_node`, and `draw_node`:
+Launch the complete simulator, including the control panel:
+
+```bash
+ros2 launch my_delta_robot control.launch.py
+```
+
+To launch only the robot model, RViz, `main_node`, and `draw_node`:
 
 ```bash
 ros2 launch my_delta_robot display.launch.py
 ```
 
-Run the GUI in another terminal:
+The GUI can also be started separately in another terminal:
 
 ```bash
 source install/setup.bash
@@ -66,7 +73,17 @@ source install/setup.bash
 ros2 run my_delta_robot user_interface_node.py
 ```
 
-## GUI Defaults
+## Operator Control Panel
+
+The control panel shows whether `main_node` and `draw_node` are connected and
+disables motion buttons while a command is active. It provides:
+
+- Gentle, Normal, and Fast motion-limit presets, plus editable velocity and acceleration.
+- One-click Rectangle, Triangle, and Smooth Circle commands.
+- Live TCP X/Y/Z position in millimetres.
+- Direct Cartesian target moves, Return Home, and Copy Current to Target.
+- X/Y/Z jog buttons with 1, 2, 5, 10, or 20 mm steps.
+- A timestamped activity log with drawing start, completion, and failure feedback.
 
 The GUI and terminal UI start with these motion limits:
 
@@ -75,7 +92,9 @@ The GUI and terminal UI start with these motion limits:
 | `vmax` | `5000.0` mm/s |
 | `amax` | `100.0` mm/s^2 |
 
-Both values must be numeric and positive before a drawing command can be sent.
+Both values must be finite and positive. GUI manual moves also validate the
+configured Z workspace of `-480` through `-375` mm. Commands execute immediately;
+this simulation interface does not yet provide pause, cancel, or emergency stop.
 
 ## Communication
 
@@ -87,11 +106,12 @@ Architecture diagrams and sequence flows are available in
 | Publisher | Topic | Message | Receiver | Purpose |
 |-----------|-------|---------|----------|---------|
 | GUI or terminal UI | `/set_vmax_amax` | `my_delta_robot/msg/VmaxAmax` | `main_node` | Update velocity and acceleration limits |
-| GUI or terminal UI | `/set_current_point` | `my_delta_robot/msg/Posicionxyz` | `draw_node` | Queue a drawing action |
-| `draw_node` | `/input_ls_final` | `my_delta_robot/msg/LinearSpeedXYZ` | `main_node` | Send one Cartesian line segment |
+| GUI or terminal UI | `/set_current_point` | `my_delta_robot/msg/Posicionxyz` | `draw_node` | Queue a drawing action or synchronize the path origin |
+| GUI or `draw_node` | `/input_ls_final` | `my_delta_robot/msg/LinearSpeedXYZ` | `main_node` | Send one Cartesian line segment |
 | `draw_node` | `/input_circle` | `my_delta_robot/msg/CircleXYZ` | `main_node` | Send one continuous circular trajectory |
-| `main_node` | `/joint_states` | `sensor_msgs/msg/JointState` | `robot_state_publisher` / RViz | Visualize robot state |
-| `main_node` | `/status_delta` | `std_msgs/msg/String` | `draw_node` | Report `DONE ...` or `FAILED: ...` for a segment |
+| `main_node` | `/joint_states` | `sensor_msgs/msg/JointState` | GUI, `robot_state_publisher`, RViz | Report live TCP/joint state; 5 Hz while idle and trajectory rate while moving |
+| `main_node` | `/status_delta` | `std_msgs/msg/String` | GUI, `draw_node` | Report `DONE ...` or `FAILED: ...` for a segment |
+| `draw_node` | `/drawing_status` | `std_msgs/msg/String` | GUI | Report `STARTED:`, `DONE:`, or `FAILED:` for a complete shape |
 
 Drawing actions are encoded in the existing `Posicionxyz.type` field:
 
@@ -101,7 +121,8 @@ Drawing actions are encoded in the existing `Posicionxyz.type` field:
 | Triangle | `7` | Queue triangle path |
 | Circle | `8` | Approach the circle, execute one continuous revolution, and return home |
 
-No new custom message, service, or action is required for the GUI node.
+The richer GUI reuses the existing custom messages and adds only a standard
+`std_msgs/String` drawing-status topic.
 
 The circle command uses a trapezoidal or triangular speed profile along the circumference. Position, tangent velocity, and radial centripetal acceleration are sampled continuously at 1 kHz, so the robot does not stop at intermediate circle points. Circle speed is curvature-limited so combined tangential and centripetal acceleration stays inside the configured acceleration envelope.
 
@@ -139,7 +160,7 @@ Send a direct line segment to `main_node`:
 
 ```bash
 ros2 topic pub --once /input_ls_final my_delta_robot/msg/LinearSpeedXYZ \
-  "{xo: 0.0, yo: 0.0, zo: -375.0, xf: 0.0, yf: 0.0, zf: -490.0, gripper: 0}"
+  "{xo: 0.0, yo: 0.0, zo: -375.0, xf: 0.0, yf: 0.0, zf: -450.0, gripper: 0}"
 ```
 
 ## `set_current_point` Type Codes
@@ -188,5 +209,5 @@ src/
 
 - The current runtime is intended for ROS simulation and visualization.
 - Physical DRV8825/NEMA23 hardware still needs a lower-level step scheduler or embedded controller.
-- `Reset Form` in the GUI resets the fields only; the current ROS command interface does not include a motion cancel command.
+- The control panel disables overlapping GUI commands, but the current ROS command interface does not include a motion cancel or emergency-stop command.
 - A new shape command is rejected while another drawing sequence is active. A `FAILED:` segment status clears the remaining queue instead of advancing from an unconfirmed position.

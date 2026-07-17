@@ -25,9 +25,8 @@ namespace {
 using SteadyClock = std::chrono::steady_clock;
 
 constexpr auto kMotionTick = std::chrono::milliseconds(1);
-constexpr auto kStartupPublishPeriod = std::chrono::milliseconds(200);
+constexpr auto kIdleStatePublishPeriod = std::chrono::milliseconds(200);
 constexpr double kMotionSamplePeriodSec = 0.001;
-constexpr int kStartupPublishCount = 15;
 constexpr double kDefaultVelocityMmS = 5000.0;
 constexpr double kDefaultAccelerationMmS2 = 100.0;
 constexpr unsigned int kDefaultLegacyResolution = 120;
@@ -72,32 +71,31 @@ public:
     joint_state_.header.frame_id = "base_link";
     joint_state_.name = delta_robot_config::kJointNames;
     joint_state_.position.resize(delta_robot_config::kNumJoints, 0.0);
+    std::copy(delta_robot_config::kInitialJointPositions.begin(),
+              delta_robot_config::kInitialJointPositions.end(),
+              joint_state_.position.begin());
 
     robot_.set_vmax_amax(kDefaultVelocityMmS, kDefaultAccelerationMmS2);
     robot_.set_resolution(kDefaultLegacyResolution);
 
-    publishInitialJointState();
-    startup_timer_ = create_wall_timer(
-        kStartupPublishPeriod, std::bind(&MainNode::onStartupTimer, this));
+    publishCurrentJointState();
     motion_timer_ = create_wall_timer(
         kMotionTick, std::bind(&MainNode::onMotionTimer, this));
+    idle_state_timer_ = create_wall_timer(
+        kIdleStatePublishPeriod, std::bind(&MainNode::onIdleStateTimer, this));
   }
 
 private:
-  void onStartupTimer() {
-    publishInitialJointState();
-    if (++startup_publish_count_ >= kStartupPublishCount) {
-      startup_timer_->cancel();
-      startup_timer_.reset();
-    }
-  }
-
-  void publishInitialJointState() {
-    std::copy(delta_robot_config::kInitialJointPositions.begin(),
-              delta_robot_config::kInitialJointPositions.end(),
-              joint_state_.position.begin());
+  void publishCurrentJointState() {
     joint_state_.header.stamp = now();
     joint_states_publisher_->publish(joint_state_);
+  }
+
+  void onIdleStateTimer() {
+    if (motion_active_) {
+      return;
+    }
+    publishCurrentJointState();
   }
 
   void
@@ -297,9 +295,8 @@ private:
   delta_robot robot_;
   sensor_msgs::msg::JointState joint_state_;
 
-  int startup_publish_count_{0};
-  rclcpp::TimerBase::SharedPtr startup_timer_;
   rclcpp::TimerBase::SharedPtr motion_timer_;
+  rclcpp::TimerBase::SharedPtr idle_state_timer_;
 
   bool motion_active_{false};
   std::size_t last_published_sample_index_{0};

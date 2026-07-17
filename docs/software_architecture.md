@@ -1,8 +1,9 @@
 # Software Architecture
 
 This document illustrates the ROS 2 software architecture for `my_delta_robot`.
-The active runtime path is the one launched by `display.launch.py`; older camera
-and image-processing files are documented separately as optional or legacy flows.
+The full operator runtime is launched by `control.launch.py`, which includes
+`display.launch.py` and starts the Tkinter panel. Older camera and image-processing
+files are documented separately as optional or legacy flows.
 
 ## Active Runtime Architecture
 
@@ -39,6 +40,7 @@ flowchart LR
         JointStates["/joint_states<br/>sensor_msgs/JointState"]
         VelocityOut["/v_a_out<br/>VmaxAmax runtime profile sample"]
         Status["/status_delta<br/>std_msgs/String"]
+        DrawingStatus["/drawing_status<br/>std_msgs/String"]
         RSP["robot_state_publisher<br/>URDF to TF"]
         StaticTF["static_transform_publisher<br/>world to base_link"]
         TF["/tf tree"]
@@ -47,6 +49,7 @@ flowchart LR
 
     GUI --> LimitsTopic
     GUI --> ShapeTopic
+    GUI --> DirectSegmentTopic
     TUI --> LimitsTopic
     TUI --> ShapeTopic
     CLI --> LimitsTopic
@@ -71,6 +74,10 @@ flowchart LR
     MainNode --> VelocityOut
     MainNode --> Status
     Status --> DrawNode
+    Status --> GUI
+    DrawNode --> DrawingStatus
+    DrawingStatus --> GUI
+    JointStates --> GUI
 
     JointStates --> RSP
     StaticTF --> TF
@@ -82,8 +89,9 @@ flowchart LR
 
 | Component | Source | Responsibility |
 |-----------|--------|----------------|
+| `control.launch.py` | `src/launch/control.launch.py` | Includes the display runtime and starts the Tkinter operator panel for a one-command demo. |
 | `display.launch.py` | `src/launch/display.launch.py` | Starts `world_to_base_link`, `robot_state_publisher`, `main_node`, `draw_node`, then RViz after a short delay. |
-| `gui_user_interface_node.py` | `src/python_scripts/gui_user_interface_node.py` | Publishes motion limits and a shape action from a Tkinter UI. |
+| `gui_user_interface_node.py` | `src/python_scripts/gui_user_interface_node.py` | Publishes motion limits, shape requests, direct targets, and jog moves; consumes TCP, segment, and drawing status for operator feedback and command locking. |
 | `user_interface_node.py` | `src/python_scripts/user_interface_node.py` | Legacy terminal UI that publishes the same active command topics. |
 | `draw_node` | `src/src/draw_node.cpp` | Guards one active drawing sequence and coordinates approach line, continuous circle, and return line states. |
 | `main_node` | `src/src/main_node.cpp` | Validates line/circle motion and limits, preflights IK, executes against steady-clock elapsed time, and publishes joint states plus `DONE`/`FAILED` status. |
@@ -97,7 +105,7 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     autonumber
-    participant UI as GUI or terminal UI
+    participant UI as Operator GUI or terminal UI
     participant Limits as /set_vmax_amax
     participant Shape as /set_current_point
     participant Draw as draw_node
@@ -143,6 +151,7 @@ sequenceDiagram
     alt More queued waypoints
         Draw->>Segment: Publish next LinearSpeedXYZ
     else Queue empty
+        Draw->>UI: Publish DONE on /drawing_status
         Draw->>Draw: Wait for next command
     end
 ```
@@ -152,7 +161,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant CLI as ros2 topic pub or custom node
+    participant CLI as GUI, ros2 topic pub, or custom node
     participant Segment as /input_ls_final
     participant Main as main_node
     participant Planner as CartesianTrajectoryGenerator
@@ -227,8 +236,8 @@ sequenceDiagram
     Launch->>Main: Start trajectory executor
     Launch->>Draw: Start shape waypoint queue
     Main->>RSP: Publish initial /joint_states immediately
-    loop 15 startup republishes every 200 ms
-        Main->>RSP: Republish home pose to avoid startup race
+    loop Startup and idle heartbeat every 200 ms
+        Main->>RSP: Republish current state to avoid startup races
     end
     Launch->>RViz: Start after 2 second TimerAction
     RSP->>RViz: TF tree and robot model become visible
@@ -271,11 +280,12 @@ flowchart LR
 |-------|---------|-----------|------------|-------|
 | `/set_vmax_amax` | `VmaxAmax` | GUI, terminal UI, CLI | `main_node` | Sets max velocity and acceleration in mm units at the command interface. |
 | `/set_current_point` | `Posicionxyz` | GUI, terminal UI, CLI | `draw_node` | Type `6`, `7`, `8` request rectangle, triangle, circle. Types `-1` through `5` update draw-node reference state. |
-| `/input_ls_final` | `LinearSpeedXYZ` | `draw_node`, CLI/custom nodes | `main_node` | One Cartesian line segment from start to target. |
+| `/input_ls_final` | `LinearSpeedXYZ` | GUI, `draw_node`, CLI/custom nodes | `main_node` | One Cartesian line segment from start to target. The GUI synchronizes `draw_node`'s current point after completion. |
 | `/input_circle` | `CircleXYZ` | `draw_node`, custom nodes | `main_node` | One full parametric circle with continuous tangential motion. |
 | `/set_num_point` | `NumPoint` | CLI/custom nodes | `main_node` | Updates the legacy offline resolution value; runtime planner samples at 1 kHz. |
-| `/joint_states` | `sensor_msgs/JointState` | `main_node` | `robot_state_publisher`, RViz, optional serial bridge | Contains 12 published joints matching `joint_state_config.hpp` and the URDF. |
-| `/status_delta` | `std_msgs/String` | `main_node` | `draw_node` | `DONE ...` advances the queue; `FAILED: ...` clears it without updating the assumed current point. |
+| `/joint_states` | `sensor_msgs/JointState` | `main_node` | GUI, `robot_state_publisher`, RViz, optional serial bridge | Contains 12 published joints matching `joint_state_config.hpp` and the URDF; idle heartbeat is 5 Hz. |
+| `/status_delta` | `std_msgs/String` | `main_node` | GUI, `draw_node` | `DONE ...` advances the queue; `FAILED: ...` clears it without updating the assumed current point. |
+| `/drawing_status` | `std_msgs/String` | `draw_node` | GUI | Complete drawing lifecycle: `STARTED:`, `DONE:`, or `FAILED:`. |
 | `/v_a_out` | `VmaxAmax` | `main_node` | optional observers | Publishes current path velocity and acceleration sample values. |
 | `/send_to_node_b` | `Posicionxyz` | legacy `node_a` or custom nodes | `draw_node` | Supported by `draw_node`, but active CMake does not build `node_a`. |
 | `/status_to_node_a` | `std_msgs/String` | `draw_node` | legacy `node_a` | Used only by the legacy image-pipeline handshake. |

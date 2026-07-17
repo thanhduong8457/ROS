@@ -86,6 +86,8 @@ public:
         create_publisher<my_delta_robot::msg::CircleXYZ>("input_circle", 10);
     legacy_status_publisher_ =
         create_publisher<std_msgs::msg::String>("status_to_node_a", 10);
+    drawing_status_publisher_ =
+        create_publisher<std_msgs::msg::String>("drawing_status", 10);
   }
 
 private:
@@ -122,6 +124,7 @@ private:
     }
     if (waypoint_queue_.empty()) {
       finishLegacyCommand(true, "Legacy point sequence completed");
+      finishDrawing(true, "completed");
       return;
     }
 
@@ -151,6 +154,7 @@ private:
       circle_pending_ = false;
       waypoint_queue_.clear();
       finishLegacyCommand(false, msg->data);
+      finishDrawing(false, msg->data);
       RCLCPP_ERROR(get_logger(), "Drawing sequence stopped: %s",
                    msg->data.c_str());
       return;
@@ -269,16 +273,19 @@ private:
                   draw_offset_mm_, legacy_target_offset_mm_);
       return;
     case DrawCommandType::kDrawRectangle:
+      startDrawing("rectangle");
       replaceQueue(delta_drawing::rectanglePath(path_points_, draw_offset_mm_,
                                                 current_point_));
       RCLCPP_INFO(get_logger(), "Rectangle path queued");
       break;
     case DrawCommandType::kDrawTriangle:
+      startDrawing("triangle");
       replaceQueue(delta_drawing::trianglePath(path_points_, draw_offset_mm_,
                                                current_point_));
       RCLCPP_INFO(get_logger(), "Triangle path queued");
       break;
     case DrawCommandType::kDrawCircle: {
+      startDrawing("circle");
       const double radius_mm =
           std::max(kDefaultCircleRadiusMm, std::abs(legacy_target_offset_mm_));
       circle_center_mm_ = {
@@ -367,6 +374,26 @@ private:
     legacy_command_active_ = false;
   }
 
+  void startDrawing(const std::string &name) {
+    active_drawing_ = name;
+    std_msgs::msg::String status;
+    status.data = "STARTED: " + name;
+    drawing_status_publisher_->publish(status);
+  }
+
+  void finishDrawing(bool success, const std::string &detail) {
+    if (active_drawing_.empty()) {
+      return;
+    }
+    std_msgs::msg::String status;
+    status.data = (success ? "DONE: " : "FAILED: ") + active_drawing_;
+    if (!success && !detail.empty()) {
+      status.data += " - " + detail;
+    }
+    drawing_status_publisher_->publish(status);
+    active_drawing_.clear();
+  }
+
   double draw_offset_mm_{20.0};
   double legacy_target_offset_mm_{10.0};
   MotionKind motion_in_flight_{MotionKind::kNone};
@@ -382,6 +409,7 @@ private:
   Point rectangle_target_{0.0, -100.0, -453.0};
   Point triangle_target_{100.0, -100.0, -453.0};
   Point last_legacy_command_;
+  std::string active_drawing_;
 
   rclcpp::Subscription<my_delta_robot::msg::Posicionxyz>::SharedPtr
       legacy_point_subscription_;
@@ -393,6 +421,7 @@ private:
   rclcpp::Publisher<my_delta_robot::msg::CircleXYZ>::SharedPtr
       circle_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr legacy_status_publisher_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr drawing_status_publisher_;
 };
 
 int main(int argc, char **argv) {

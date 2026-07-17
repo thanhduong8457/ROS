@@ -4,7 +4,7 @@ _Last reviewed and verified: 2026-07-18_
 
 ## Executive Summary
 
-`my_delta_robot` is a ROS 2 package for simulating and visualizing a three-arm delta parallel robot. Its current active workflow accepts a rectangle, triangle, circle, or direct Cartesian line command; generates a time-sampled straight-line trajectory; validates inverse kinematics (IK) for the entire path; and publishes a 12-joint state for `robot_state_publisher` and RViz.
+`my_delta_robot` is a ROS 2 package for simulating and visualizing a three-arm delta parallel robot. Its current active workflow accepts rectangle, triangle, smooth-circle, direct Cartesian, and incremental jog commands; generates time-sampled trajectories; validates inverse kinematics (IK) for the entire path; and publishes a 12-joint state for the operator panel, `robot_state_publisher`, and RViz.
 
 The project is currently strongest as a motion-planning and visualization prototype. It has a working ROS 2 command path, a reusable C++ kinematics/trajectory library, a Tkinter GUI, a terminal UI, a URDF/RViz setup, custom messages, and unit tests. Camera processing and physical motor communication exist only as legacy or experimental source files and are not part of the active build or launch path.
 
@@ -17,7 +17,7 @@ The project is currently strongest as a motion-planning and visualization protot
 | Inverse kinematics | Active | Every planned sample is checked before motion begins and checked again during execution. |
 | Shape drawing | Active | Rectangle and triangle use sequential lines; circles use one continuous 1 kHz parametric trajectory. |
 | Visualization | Active | URDF, TF, `/joint_states`, and RViz are started by `display.launch.py`. |
-| User interfaces | Active | Tkinter GUI and terminal UI publish the same motion-limit and shape topics. |
+| User interfaces | Active | The Tkinter operator panel provides connection/busy state, live TCP coordinates, limit presets, one-click shapes, direct moves, jog controls, and an activity log. A legacy terminal UI remains available. |
 | Automated tests | Passing | One GoogleTest target covers IK, joint mapping, planner profiles and guards, command validation, and shape closure. |
 | Latest verification | Passing | On 2026-07-18 the package built successfully and `colcon test-result --verbose` reported 13 tests with 0 errors, failures, or skips. |
 | Camera/image flow | Legacy | Several scripts use ROS 1 `rospy`; they are not installed or launched by the ROS 2 package. |
@@ -26,7 +26,7 @@ The project is currently strongest as a motion-planning and visualization protot
 Repository snapshot at review time:
 
 - Git branch: `branch_ros2`
-- Latest commit: `181e121` (`2026-05-29`, “add detail about architecture of software”)
+- Latest committed baseline: `9363ebe` (`2026-07-18`, “Refactor motion flow and add smooth circle trajectories”)
 - Active build products: `main_node`, `draw_node`, and three installed Python scripts
 - Main documentation: `README.md` and `docs/software_architecture.md`
 
@@ -34,7 +34,7 @@ Repository snapshot at review time:
 
 ```mermaid
 flowchart LR
-    UI["Tkinter GUI / terminal UI / ROS 2 CLI"]
+    UI["Tkinter operator panel / terminal UI / ROS 2 CLI"]
     LIMITS["/set_vmax_amax"]
     SHAPE["/set_current_point"]
     DRAW["draw_node<br/>shape waypoint queue"]
@@ -46,15 +46,19 @@ flowchart LR
     RSP["robot_state_publisher"]
     RVIZ["RViz"]
     STATUS["/status_delta"]
+    DRAW_STATUS["/drawing_status"]
 
     UI --> LIMITS --> MAIN
     UI --> SHAPE --> DRAW
+    UI --> SEGMENT
     DRAW --> SEGMENT --> MAIN
     DRAW --> CIRCLE --> MAIN
     MAIN --> CORE
     CORE --> MAIN
     MAIN --> JS --> RSP --> RVIZ
     MAIN --> STATUS --> DRAW
+    JS --> UI
+    DRAW --> DRAW_STATUS --> UI
 ```
 
 The shape flow is sequential. `draw_node` sends one line segment, waits for `main_node` to publish `DONE`, updates its current point, and then sends the next queued segment. A `FAILED:` status clears the queue without advancing the assumed current point. New drawing commands are rejected while a sequence is active.
@@ -68,9 +72,9 @@ The shape flow is sequential. `draw_node` sends one line segment, waits for `mai
 | Delta robot library | `src/delta_robot/` | Implements inverse kinematics, Cartesian line profiles, motion-limit conversion, and the 12-joint RViz mapping. |
 | Command validation | `src/delta_robot/command_validation.hpp` | Rejects non-finite coordinates and non-positive/non-finite motion limits for every command source. |
 | Shape path generation | `src/delta_robot/shape_path.hpp` | Pure helpers generate closed rectangle, triangle, and circle paths for reuse and unit testing. |
-| GUI | `src/python_scripts/gui_user_interface_node.py` | Validates velocity/acceleration input and sends a selected drawing command using Tkinter. |
+| GUI | `src/python_scripts/gui_user_interface_node.py` | Operator panel for motion limits, shape drawing, direct targets, jogging, live TCP feedback, connection state, busy state, and activity history. |
 | Terminal UI | `src/python_scripts/user_interface_node.py` | Provides the same command workflow in a terminal. |
-| Launch and visualization | `src/launch/`, `src/urdf/`, `src/rviz/` | Starts the model, TF publisher, runtime nodes, and RViz configuration. |
+| Launch and visualization | `src/launch/`, `src/urdf/`, `src/rviz/` | `control.launch.py` starts the full operator environment; `display.launch.py` starts the runtime and RViz without the GUI. |
 | Custom interfaces | `src/msg/` | Defines seven project-specific message types. |
 | Tests | `src/test/test_delta_robot.cpp` | Exercises core kinematics, joint mapping, and trajectory behavior. |
 
@@ -80,12 +84,13 @@ The shape flow is sequential. `draw_node` sends one line segment, waits for `mai
 |---|---|---|---|---|
 | `/set_vmax_amax` | `VmaxAmax` | GUI, terminal UI, or CLI | `main_node` | Sets maximum Cartesian velocity and acceleration. |
 | `/set_current_point` | `Posicionxyz` | GUI, terminal UI, or CLI | `draw_node` | Updates draw configuration or requests a shape. |
-| `/input_ls_final` | `LinearSpeedXYZ` | `draw_node` or CLI | `main_node` | Commands one Cartesian line segment in millimetres. |
+| `/input_ls_final` | `LinearSpeedXYZ` | GUI, `draw_node`, or CLI | `main_node` | Commands one Cartesian line segment in millimetres. |
 | `/input_circle` | `CircleXYZ` | `draw_node` or custom node | `main_node` | Commands one full continuous circle using center, Z plane, radius, and direction. |
 | `/set_num_point` | `NumPoint` | CLI/custom node | `main_node` | Sets the legacy offline resolution; it does not change the active 1 kHz runtime sampling. |
-| `/joint_states` | `sensor_msgs/JointState` | `main_node` | `robot_state_publisher`/RViz | Publishes the robot's 12 modeled joints. |
+| `/joint_states` | `sensor_msgs/JointState` | `main_node` | GUI, `robot_state_publisher`/RViz | Publishes 12 modeled joints at 5 Hz while idle and at trajectory rate while moving; the GUI reads `act_x/y/z` as live TCP coordinates. |
 | `/v_a_out` | `VmaxAmax` | `main_node` | Optional observers | Reports each sample's path velocity and acceleration. |
-| `/status_delta` | `std_msgs/String` | `main_node` | `draw_node` | Reports `DONE ...` on completion or `FAILED: ...` on a rejected/aborted segment. |
+| `/status_delta` | `std_msgs/String` | `main_node` | GUI, `draw_node` | Reports `DONE ...` on completion or `FAILED: ...` on a rejected/aborted segment. |
+| `/drawing_status` | `std_msgs/String` | `draw_node` | GUI | Reports complete-shape `STARTED:`, `DONE:`, and `FAILED:` states. |
 | `/send_to_node_b` | `Posicionxyz` | Legacy/custom source | `draw_node` | Retained compatibility input for the older image pipeline. |
 | `/status_to_node_a` | `std_msgs/String` | `draw_node` | Legacy `node_a` | Retained completion signal for the older image pipeline. |
 
@@ -114,7 +119,13 @@ source install/setup.zsh
 ros2 launch my_delta_robot display.launch.py
 ```
 
-Run the GUI in another sourced terminal:
+For the full operator environment, launch the runtime, RViz, and GUI together:
+
+```bash
+ros2 launch my_delta_robot control.launch.py
+```
+
+Alternatively, run the GUI in another sourced terminal:
 
 ```bash
 ros2 run my_delta_robot gui_user_interface_node.py
@@ -159,7 +170,7 @@ ROS2/
 2. **Legacy code is mixed into the package tree:** camera scripts use ROS 1 APIs, and `node_a.cpp`, `node_b.cpp`, `serial_module.cpp`, and other experimental C++ files are not built by the current CMake configuration. This can make active versus historical functionality unclear.
 3. **Limited integration coverage:** core math, guards, and shape generation have tests, but live node topic behavior, launch startup, GUI behavior, and URDF/TF consistency are not tested automatically.
 4. **Status remains string-based:** success/failure handling is now explicit, but `/status_delta` still uses human-readable strings rather than a typed service or action result.
-5. **No cancel or pause protocol:** the GUI reset only clears form fields. There is no ROS service/action for canceling or pausing active motion.
+5. **No cancel or pause protocol:** GUI commands are serialized and buttons are disabled while busy, but there is no ROS service/action for canceling, pausing, or emergency-stopping active motion.
 6. **Single-command execution:** active motion and drawing sequences reject new commands instead of buffering them. Shape sequencing still depends on the `/status_delta` handshake.
 7. **Prototype metadata:** the package version remains `0.0.0`, and the package manifest does not communicate a release maturity level.
 
