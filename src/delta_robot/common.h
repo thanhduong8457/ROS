@@ -1,128 +1,86 @@
 #pragma once
 
-#include <iostream>
-#include <chrono>
-#include <vector>
-#include <cmath>
+inline constexpr double sqrt3 = 1.732050808;
+inline constexpr double pi = 3.141592654;
+inline constexpr double sin120 = 0.8660254038;
+inline constexpr double cos120 = -0.5;
+inline constexpr double sin240 = -0.8660254038;
+inline constexpr double cos240 = -0.5;
+inline constexpr double tan60 = 1.732050808;
+inline constexpr double sin30 = 0.5;
+inline constexpr double tan30 = 0.5773502692;
 
-// Avoid "using namespace std" in headers; use std:: in .cpp files as needed
+inline constexpr double ee = 86.5;  // End-effector side length [mm].
+inline constexpr double ff = 346.4; // Base side length [mm].
+inline constexpr double re = 465.0; // Forearm length [mm].
+inline constexpr double rf = 200.0; // Upper-arm length [mm].
+inline constexpr double hf = 299.99119987;
+inline constexpr double he = 74.911197427;
 
-#define sqrt3   1.732050808
-#define pi      3.141592654
-#define sin120  0.8660254038
-#define cos120  -0.5
-
-#define sin240  -0.8660254038
-#define cos240  -0.5
-
-#define tan60   1.732050808
-#define sin30   0.5
-#define tan30   0.5773502692
-
-#define ee      86.5       // endeffector 
-#define ff      346.4      // base
-#define re      465        // endeffector arm
-#define rf      200        // Base arm
-
-#define hf      299.99119987
-#define he      74.911197427
-
-#define mmtm    0.001
-#define mtmm    1000
-#define dtr     (pi/180)
-#define rtd     (180/pi)
+inline constexpr double mmtm = 0.001;
+inline constexpr double mtmm = 1000.0;
+inline constexpr double dtr = pi / 180.0;
+inline constexpr double rtd = 180.0 / pi;
 
 class Point {
 public:
-    double x;
-    double y;
-    double z;
+  double x{0.0};
+  double y{0.0};
+  double z{0.0};
 
-    Point(double x, double y, double z) {
-        init();
-        this->x = x;
-        this->y = y;
-        this->z = z;
-    }
+  Point() = default;
+  Point(double x_value, double y_value, double z_value)
+      : x(x_value), y(y_value), z(z_value) {}
+  Point(const Point &) = default;
+  Point &operator=(const Point &) = default;
 
-    Point() {
-        init();
-    }
-    Point(const Point& other) {
-        this->x = other.x;
-        this->y = other.y;
-        this->z = other.z;
-    }
+  bool operator==(const Point &other) const {
+    return this->x == other.x && this->y == other.y && this->z == other.z;
+  }
 
-    bool operator==(const Point& other) const {
-        return this->x == other.x && this->y == other.y && this->z == other.z;
-    }
+  bool operator!=(const Point &other) const { return !(*this == other); }
 
-    bool operator!=(const Point& other) const {
-        return !(*this == other);
-    }
-
-    Point& operator=(const Point& other) {
-        this->x = other.x;
-        this->y = other.y;
-        this->z = other.z;
-        return *this;
-    }
-
-    void init() {
-        x = 0;
-        y = 0;
-        z = 0;
-    }
+  void init() {
+    x = 0.0;
+    y = 0.0;
+    z = 0.0;
+  }
 };
 
 /// @brief The Theta class represents the angles of the delta robot's arms.
 class Theta {
 public:
-    double angle1;
-    double angle2;
-    double angle3;
+  double angle1{0.0};
+  double angle2{0.0};
+  double angle3{0.0};
 
-    Theta() {
-        init();
-    }
+  Theta() = default;
+  Theta(const Theta &) = default;
+  Theta &operator=(const Theta &) = default;
 
-    Theta(const Theta& other) {
-        this->angle1 = other.angle1;
-        this->angle2 = other.angle2;
-        this->angle3 = other.angle3;
-    }
-
-    Theta& operator=(const Theta& other) {
-        this->angle1 = other.angle1;
-        this->angle2 = other.angle2;
-        this->angle3 = other.angle3;
-        return *this;
-    }
-
-    void init(void) {
-        angle1 = 0;
-        angle2 = 0;
-        angle3 = 0;
-    }
+  void init(void) {
+    angle1 = 0.0;
+    angle2 = 0.0;
+    angle3 = 0.0;
+  }
 };
 
-/// @brief 
+/// @brief
 typedef struct data_delta {
-    double pos;     //
-    Point position_val;
+  double pos{0.0};
+  Point position_val;
 
-    double vel; //
-    double vel_x;
-    double vel_y;
-    double vel_z;
+  double vel{0.0};
+  double vel_x{0.0};
+  double vel_y{0.0};
+  double vel_z{0.0};
 
-    double acel; //
-    double acel_x;
-    double acel_y;
-    double acel_z;
+  double acel{0.0};
+  double acel_x{0.0};
+  double acel_y{0.0};
+  double acel_z{0.0};
 
-    Theta theta_val;
+  Theta theta_val;
 
-    double time_point; //
-}data_delta_t;
+  double time_point{0.0};
+} data_delta_t;

@@ -16,6 +16,7 @@ find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Angulo.msg"
+  "msg/CircleXYZ.msg"
   "msg/LinearSpeedXYZ.msg"
   "msg/Posicionxyz.msg"
   "msg/PositionArm.msg"

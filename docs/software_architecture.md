@@ -18,6 +18,7 @@ flowchart LR
         LimitsTopic["/set_vmax_amax<br/>VmaxAmax"]
         ShapeTopic["/set_current_point<br/>Posicionxyz"]
         DirectSegmentTopic["/input_ls_final<br/>LinearSpeedXYZ"]
+        CircleTopic["/input_circle<br/>CircleXYZ"]
         ResolutionTopic["/set_num_point<br/>NumPoint"]
     end
 
@@ -27,6 +28,8 @@ flowchart LR
     end
 
     subgraph CoreLibrary["Delta robot C++ library"]
+        Validation["command_validation.hpp<br/>finite and positive input guards"]
+        ShapePath["shape_path.hpp<br/>closed waypoint generation"]
         Planner["CartesianTrajectoryGenerator<br/>trapezoid or triangular profile"]
         IK["delta_robot<br/>inverse_checked + joint mapping"]
         Config["joint_state_config.hpp<br/>joint names + home pose"]
@@ -54,9 +57,13 @@ flowchart LR
     LimitsTopic --> MainNode
     ResolutionTopic --> MainNode
     ShapeTopic --> DrawNode
+    DrawNode --> ShapePath
     DrawNode --> DirectSegmentTopic
+    DrawNode --> CircleTopic
     DirectSegmentTopic --> MainNode
+    CircleTopic --> MainNode
 
+    MainNode --> Validation
     MainNode --> Planner
     MainNode --> IK
     IK --> Config
@@ -78,8 +85,10 @@ flowchart LR
 | `display.launch.py` | `src/launch/display.launch.py` | Starts `world_to_base_link`, `robot_state_publisher`, `main_node`, `draw_node`, then RViz after a short delay. |
 | `gui_user_interface_node.py` | `src/python_scripts/gui_user_interface_node.py` | Publishes motion limits and a shape action from a Tkinter UI. |
 | `user_interface_node.py` | `src/python_scripts/user_interface_node.py` | Legacy terminal UI that publishes the same active command topics. |
-| `draw_node` | `src/src/draw_node.cpp` | Converts shape commands into ordered Cartesian waypoints and sends one segment at a time. |
-| `main_node` | `src/src/main_node.cpp` | Accepts line segments, plans sampled Cartesian motion, validates IK, publishes joint states and completion status. |
+| `draw_node` | `src/src/draw_node.cpp` | Guards one active drawing sequence and coordinates approach line, continuous circle, and return line states. |
+| `main_node` | `src/src/main_node.cpp` | Validates line/circle motion and limits, preflights IK, executes against steady-clock elapsed time, and publishes joint states plus `DONE`/`FAILED` status. |
+| `command_validation.hpp` | `src/delta_robot/command_validation.hpp` | Provides shared finite-coordinate and positive motion-limit validation. |
+| `shape_path.hpp` | `src/delta_robot/shape_path.hpp` | Generates deterministic closed rectangle, triangle, and circle waypoint lists. |
 | `delta_robot` library | `src/delta_robot/` | Provides inverse kinematics, motion limits, trapezoidal trajectory utilities, and RViz joint mapping. |
 | `robot_state_publisher` | ROS 2 runtime | Converts `/joint_states` plus `delta_robot.urdf` into TF transforms for RViz. |
 
@@ -106,7 +115,7 @@ sequenceDiagram
     Limits->>Main: Update motion_limits()
     UI->>Shape: Publish Posicionxyz(type 6, 7, or 8)
     Shape->>Draw: Receive drawing action
-    Draw->>Draw: Clear old queue and enqueue shape waypoints
+    Draw->>Draw: Reject if busy; otherwise generate and enqueue shape waypoints
     Draw->>Segment: Publish first LinearSpeedXYZ(start, target)
     Segment->>Main: Receive segment command
     Main->>Planner: planLine(start_m, target_m, limits, 0.001 s)
@@ -115,16 +124,22 @@ sequenceDiagram
         Main->>Robot: inverse_checked(sample.position_m)
         Robot-->>Main: IK ok or rejection reason
     end
-    loop 1 ms motion timer
-        Main->>Robot: inverse_checked(current sample)
+    loop 1 ms timer using steady-clock elapsed time
+        Main->>Main: Select latest due sample
+        Main->>Robot: inverse_checked(selected sample)
         Main->>Robot: create_joint_state_list(position, theta)
         Main->>JS: Publish JointState
         Main->>VOut: Publish profile velocity and acceleration
         JS->>RSP: Consume joint positions
         RSP->>RViz: Publish TF transforms
     end
-    Main->>Status: Publish segment DONE message
-    Status->>Draw: Mark waypoint complete
+    alt Segment completes
+        Main->>Status: Publish DONE message
+        Status->>Draw: Mark waypoint complete
+    else Runtime failure
+        Main->>Status: Publish FAILED message
+        Status->>Draw: Clear queue without advancing current point
+    end
     alt More queued waypoints
         Draw->>Segment: Publish next LinearSpeedXYZ
     else Queue empty
@@ -149,21 +164,50 @@ sequenceDiagram
     Segment->>Main: Segment callback
     alt Motion already active
         Main-->>CLI: Reject through ROS warning log
-    else Start and target are identical
-        Main-->>CLI: Ignore through ROS warning log
+    else Invalid or identical coordinates
+        Main->>Status: Publish FAILED with reason
     else Segment accepted
         Main->>Planner: Generate sampled line profile
         Main->>Robot: Validate IK for every planned sample
         alt Planning or IK fails
-            Main-->>CLI: Reject through ROS error log
+            Main->>Status: Publish FAILED with reason
         else Plan valid
-            loop Motion timer at 1 kHz
+            loop 1 kHz timer paced by steady-clock elapsed time
+                Main->>Main: Select latest due trajectory sample
                 Main->>Robot: Compute IK and 12-joint RViz state
                 Main->>JS: Publish JointState
             end
             Main->>Status: Publish DONE message
         end
     end
+```
+
+## Continuous Circle Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as GUI or terminal UI
+    participant Draw as draw_node
+    participant Line as /input_ls_final
+    participant Circle as /input_circle
+    participant Main as main_node
+    participant Planner as CartesianTrajectoryGenerator
+    participant Status as /status_delta
+
+    UI->>Draw: Posicionxyz(type 8)
+    Draw->>Line: Move from current point to circle start
+    Main->>Status: DONE approach line
+    Status->>Draw: Circle start reached
+    Draw->>Circle: CircleXYZ(center, Z, radius, direction)
+    Main->>Planner: planCircle(..., 0.001 s)
+    Planner-->>Main: One continuous sampled revolution
+    loop Steady-clock execution
+        Main->>Main: Publish latest due tangent-motion sample
+    end
+    Main->>Status: DONE circle
+    Status->>Draw: Revolution completed
+    Draw->>Line: Return from circle start to home
 ```
 
 ## Launch And Visualization Startup
@@ -228,9 +272,10 @@ flowchart LR
 | `/set_vmax_amax` | `VmaxAmax` | GUI, terminal UI, CLI | `main_node` | Sets max velocity and acceleration in mm units at the command interface. |
 | `/set_current_point` | `Posicionxyz` | GUI, terminal UI, CLI | `draw_node` | Type `6`, `7`, `8` request rectangle, triangle, circle. Types `-1` through `5` update draw-node reference state. |
 | `/input_ls_final` | `LinearSpeedXYZ` | `draw_node`, CLI/custom nodes | `main_node` | One Cartesian line segment from start to target. |
+| `/input_circle` | `CircleXYZ` | `draw_node`, custom nodes | `main_node` | One full parametric circle with continuous tangential motion. |
 | `/set_num_point` | `NumPoint` | CLI/custom nodes | `main_node` | Updates the legacy offline resolution value; runtime planner samples at 1 kHz. |
 | `/joint_states` | `sensor_msgs/JointState` | `main_node` | `robot_state_publisher`, RViz, optional serial bridge | Contains 12 published joints matching `joint_state_config.hpp` and the URDF. |
-| `/status_delta` | `std_msgs/String` | `main_node` | `draw_node` | Segment-complete handshake for queued waypoints. |
+| `/status_delta` | `std_msgs/String` | `main_node` | `draw_node` | `DONE ...` advances the queue; `FAILED: ...` clears it without updating the assumed current point. |
 | `/v_a_out` | `VmaxAmax` | `main_node` | optional observers | Publishes current path velocity and acceleration sample values. |
 | `/send_to_node_b` | `Posicionxyz` | legacy `node_a` or custom nodes | `draw_node` | Supported by `draw_node`, but active CMake does not build `node_a`. |
 | `/status_to_node_a` | `std_msgs/String` | `draw_node` | legacy `node_a` | Used only by the legacy image-pipeline handshake. |

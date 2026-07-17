@@ -1,5 +1,6 @@
 #include "delta_robot.h"
 #include "joint_state_config.hpp"
+#include <iostream>
 
 /// @brief 
 /// @param  
@@ -441,7 +442,7 @@ void delta_robot::inverse_all_joint_state_exist(void) {
 /// @brief 
 /// @param vmax 
 /// @param amax 
-void delta_robot::set_vmax_amax(unsigned int vmax, unsigned int amax) {
+void delta_robot::set_vmax_amax(double vmax, double amax) {
     this->vmax = vmax;
     this->amax = amax;
 }
@@ -574,7 +575,7 @@ bool delta_robot::angle_yz(Point point, double& theta) {
 void delta_robot::create_joint_state_list(
     Point pointi,
     Theta theta,
-    double (&position)[12]
+    std::array<double, 12>& position
 ) {
     // Rviz interior angles in Radians
     double punto[3] = {-pointi.y, -pointi.x, -pointi.z};

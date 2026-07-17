@@ -2,10 +2,13 @@
 
 ROS 2 package for a delta parallel robot. The package includes Cartesian trajectory planning, inverse kinematics, drawing path sequencing, RViz visualization, and Python user interfaces for sending drawing commands.
 
+For a current project-level summary, status, known gaps, and recommended next steps, see [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md).
+
 ## Features
 
-- `main_node`: receives line-segment motion commands, plans Cartesian trajectories, validates IK, and publishes `/joint_states`.
-- `draw_node`: receives drawing commands and queues rectangle, triangle, or circle waypoints.
+- `main_node`: validates line-segment commands, plans Cartesian trajectories, preflights IK, follows planned elapsed time, and publishes `/joint_states`.
+- `draw_node`: generates drawing paths and executes them through a protected sequential waypoint queue; circles use one continuous 1 kHz trajectory without stops between polygon edges.
+- Reusable validation and shape-generation helpers in `src/delta_robot/` keep ROS callbacks small and core behavior testable.
 - `gui_user_interface_node.py`: Tkinter GUI for setting `vmax`, `amax`, and the target drawing action.
 - `user_interface_node.py`: legacy terminal UI that publishes the same command topics as the GUI.
 - Custom ROS 2 messages in `msg/`.
@@ -86,8 +89,9 @@ Architecture diagrams and sequence flows are available in
 | GUI or terminal UI | `/set_vmax_amax` | `my_delta_robot/msg/VmaxAmax` | `main_node` | Update velocity and acceleration limits |
 | GUI or terminal UI | `/set_current_point` | `my_delta_robot/msg/Posicionxyz` | `draw_node` | Queue a drawing action |
 | `draw_node` | `/input_ls_final` | `my_delta_robot/msg/LinearSpeedXYZ` | `main_node` | Send one Cartesian line segment |
+| `draw_node` | `/input_circle` | `my_delta_robot/msg/CircleXYZ` | `main_node` | Send one continuous circular trajectory |
 | `main_node` | `/joint_states` | `sensor_msgs/msg/JointState` | `robot_state_publisher` / RViz | Visualize robot state |
-| `main_node` | `/status_delta` | `std_msgs/msg/String` | `draw_node` | Notify that a segment is complete |
+| `main_node` | `/status_delta` | `std_msgs/msg/String` | `draw_node` | Report `DONE ...` or `FAILED: ...` for a segment |
 
 Drawing actions are encoded in the existing `Posicionxyz.type` field:
 
@@ -95,9 +99,11 @@ Drawing actions are encoded in the existing `Posicionxyz.type` field:
 |------------|--------|-------------------------|
 | Rectangle | `6` | Queue rectangle/square path |
 | Triangle | `7` | Queue triangle path |
-| Circle | `8` | Queue approximated circle path |
+| Circle | `8` | Approach the circle, execute one continuous revolution, and return home |
 
 No new custom message, service, or action is required for the GUI node.
+
+The circle command uses a trapezoidal or triangular speed profile along the circumference. Position, tangent velocity, and radial centripetal acceleration are sampled continuously at 1 kHz, so the robot does not stop at intermediate circle points. Circle speed is curvature-limited so combined tangential and centripetal acceleration stays inside the configured acceleration envelope.
 
 ## Example Topic Commands
 
@@ -141,12 +147,12 @@ ros2 topic pub --once /input_ls_final my_delta_robot/msg/LinearSpeedXYZ \
 | Type | Meaning |
 |------|---------|
 | `-1` | Set current TCP position |
-| `0` | Update circle reference point |
-| `1` | Update rectangle/square reference point |
-| `2` | Update triangle reference point |
-| `3` | Set Z start offset |
-| `4` | Set Z end offset |
-| `5` | Set both Z offsets |
+| `0` | Update path point A from `x0`, `y0`, `z0` |
+| `1` | Update path point B from `x0`, `y0`, `z0` |
+| `2` | Update path point C from `x0`, `y0`, `z0` |
+| `3` | Set the drawing Z offset from `x0` |
+| `4` | Set the legacy target Z offset from `x0` |
+| `5` | Set drawing and legacy target Z offsets from `x0` and `y0` |
 | `6` | Queue rectangle/square drawing path |
 | `7` | Queue triangle drawing path |
 | `8` | Queue circle drawing path |
@@ -159,6 +165,8 @@ source install/setup.bash
 colcon test --packages-select my_delta_robot
 colcon test-result --verbose
 ```
+
+The current suite contains 13 tests covering IK, joint mapping, triangular and trapezoidal line motion, continuous clockwise/counter-clockwise circles, invalid planner input, sample-count protection, command validation, and shape closure.
 
 ## Package Layout
 
@@ -181,3 +189,4 @@ src/
 - The current runtime is intended for ROS simulation and visualization.
 - Physical DRV8825/NEMA23 hardware still needs a lower-level step scheduler or embedded controller.
 - `Reset Form` in the GUI resets the fields only; the current ROS command interface does not include a motion cancel command.
+- A new shape command is rejected while another drawing sequence is active. A `FAILED:` segment status clears the remaining queue instead of advancing from an unconfirmed position.
