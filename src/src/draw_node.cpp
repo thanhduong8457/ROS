@@ -1,8 +1,10 @@
-#include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <deque>
+#include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -18,23 +20,15 @@
 
 namespace {
 
-enum class LegacyTargetType : int {
-  kCircle = 0,
-  kRectangle = 1,
-  kTriangle = 2,
-};
-
-enum class DrawCommandType : int {
-  kCurrentPoint = -1,
-  kPathPointA = 0,
-  kPathPointB = 1,
-  kPathPointC = 2,
-  kDrawOffset = 3,
-  kLegacyTargetOffset = 4,
-  kBothOffsets = 5,
-  kDrawRectangle = 6,
-  kDrawTriangle = 7,
-  kDrawCircle = 8,
+enum class DrawCommandType : std::int64_t {
+  kCurrentPoint = my_delta_robot::msg::Posicionxyz::SET_CURRENT_POINT,
+  kPathPointA = my_delta_robot::msg::Posicionxyz::SET_PATH_POINT_A,
+  kPathPointB = my_delta_robot::msg::Posicionxyz::SET_PATH_POINT_B,
+  kPathPointC = my_delta_robot::msg::Posicionxyz::SET_PATH_POINT_C,
+  kDrawOffset = my_delta_robot::msg::Posicionxyz::SET_DRAW_OFFSET,
+  kDrawRectangle = my_delta_robot::msg::Posicionxyz::DRAW_RECTANGLE,
+  kDrawTriangle = my_delta_robot::msg::Posicionxyz::DRAW_TRIANGLE,
+  kDrawCircle = my_delta_robot::msg::Posicionxyz::DRAW_CIRCLE,
 };
 
 constexpr double kWorkspaceMinZMm = -480.0;
@@ -52,9 +46,7 @@ bool isFailureStatus(const std::string &status) {
 }
 
 bool isSuccessStatus(const std::string &status) {
-  return status.rfind("DONE", 0) == 0 ||
-         (status.size() >= 4 &&
-          status.compare(status.size() - 4, 4, "DONE") == 0);
+  return status.rfind("DONE", 0) == 0;
 }
 
 } // namespace
@@ -67,11 +59,28 @@ public:
                      Point{0.0, -10.0, -453.0}, Point{10.0, 0.0, -453.0}} {
     RCLCPP_INFO(get_logger(), "draw_node started");
 
-    legacy_point_subscription_ =
-        create_subscription<my_delta_robot::msg::Posicionxyz>(
-            "send_to_node_b", 10,
-            std::bind(&DrawNode::onLegacyPointCommand, this,
-                      std::placeholders::_1));
+    draw_offset_mm_ =
+        declare_parameter<double>("draw_offset_mm", draw_offset_mm_);
+    circle_radius_mm_ =
+        declare_parameter<double>("circle_radius_mm", circle_radius_mm_);
+    circle_reference_mm_.x =
+        declare_parameter<double>("circle_center_x_mm", circle_reference_mm_.x);
+    circle_reference_mm_.y =
+        declare_parameter<double>("circle_center_y_mm", circle_reference_mm_.y);
+    circle_reference_mm_.z =
+        declare_parameter<double>("circle_base_z_mm", circle_reference_mm_.z);
+    if (!std::isfinite(draw_offset_mm_) || draw_offset_mm_ < 0.0) {
+      throw std::invalid_argument(
+          "draw_offset_mm must be finite and non-negative");
+    }
+    if (!std::isfinite(circle_radius_mm_) || circle_radius_mm_ <= 0.0) {
+      throw std::invalid_argument(
+          "circle_radius_mm must be finite and positive");
+    }
+    if (!delta_robot_validation::isFinitePoint(circle_reference_mm_)) {
+      throw std::invalid_argument("circle center parameters must be finite");
+    }
+
     draw_command_subscription_ =
         create_subscription<my_delta_robot::msg::Posicionxyz>(
             "set_current_point", 10,
@@ -84,8 +93,6 @@ public:
         "input_ls_final", 10);
     circle_publisher_ =
         create_publisher<my_delta_robot::msg::CircleXYZ>("input_circle", 10);
-    legacy_status_publisher_ =
-        create_publisher<std_msgs::msg::String>("status_to_node_a", 10);
     drawing_status_publisher_ =
         create_publisher<std_msgs::msg::String>("drawing_status", 10);
   }
@@ -123,7 +130,6 @@ private:
       waypoint_queue_.pop_front();
     }
     if (waypoint_queue_.empty()) {
-      finishLegacyCommand(true, "Legacy point sequence completed");
       finishDrawing(true, "completed");
       return;
     }
@@ -150,10 +156,14 @@ private:
     RCLCPP_INFO(get_logger(), "status from main_node: %s", msg->data.c_str());
 
     if (isFailureStatus(msg->data)) {
+      if (motion_in_flight_ == MotionKind::kNone) {
+        RCLCPP_DEBUG(get_logger(),
+                     "Ignoring failure with no drawing motion in flight");
+        return;
+      }
       motion_in_flight_ = MotionKind::kNone;
       circle_pending_ = false;
       waypoint_queue_.clear();
-      finishLegacyCommand(false, msg->data);
       finishDrawing(false, msg->data);
       RCLCPP_ERROR(get_logger(), "Drawing sequence stopped: %s",
                    msg->data.c_str());
@@ -189,51 +199,6 @@ private:
     publishNextSegment();
   }
 
-  void
-  onLegacyPointCommand(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
-    if (!commandCanStart("Legacy point command")) {
-      return;
-    }
-
-    const Point requested_point(msg->x0, msg->y0, msg->z0);
-    if (!delta_robot_validation::isFinitePoint(requested_point)) {
-      RCLCPP_ERROR(get_logger(),
-                   "Legacy point command contains non-finite coordinates");
-      return;
-    }
-
-    const int raw_type = static_cast<int>(msg->type);
-    if (raw_type < static_cast<int>(LegacyTargetType::kCircle) ||
-        raw_type > static_cast<int>(LegacyTargetType::kTriangle)) {
-      RCLCPP_ERROR(get_logger(), "Unknown legacy target type: %d", raw_type);
-      return;
-    }
-
-    last_legacy_command_ = requested_point;
-    legacy_command_active_ = true;
-    enqueuePoint(requested_point);
-    enqueuePoint({requested_point.x, requested_point.y,
-                  requested_point.z - draw_offset_mm_});
-    enqueuePoint(requested_point);
-
-    Point target;
-    switch (static_cast<LegacyTargetType>(raw_type)) {
-    case LegacyTargetType::kCircle:
-      target = circle_target_;
-      break;
-    case LegacyTargetType::kRectangle:
-      target = rectangle_target_;
-      break;
-    case LegacyTargetType::kTriangle:
-      target = triangle_target_;
-      break;
-    }
-    enqueuePoint(target);
-    enqueuePoint({target.x, target.y, target.z - legacy_target_offset_mm_});
-    enqueuePoint(target);
-    publishNextSegment();
-  }
-
   void onDrawCommand(const my_delta_robot::msg::Posicionxyz::SharedPtr msg) {
     if (!commandCanStart("Draw command")) {
       return;
@@ -258,20 +223,6 @@ private:
     case DrawCommandType::kDrawOffset:
       setOffset(draw_offset_mm_, msg->x0, "Draw Z offset");
       return;
-    case DrawCommandType::kLegacyTargetOffset:
-      setOffset(legacy_target_offset_mm_, msg->x0, "Legacy target Z offset");
-      return;
-    case DrawCommandType::kBothOffsets:
-      if (msg->x0 < 0.0 || msg->y0 < 0.0) {
-        RCLCPP_ERROR(get_logger(), "Z offsets must be non-negative");
-        return;
-      }
-      draw_offset_mm_ = msg->x0;
-      legacy_target_offset_mm_ = msg->y0;
-      RCLCPP_INFO(get_logger(),
-                  "Z offsets updated: draw=%.2f legacy_target=%.2f",
-                  draw_offset_mm_, legacy_target_offset_mm_);
-      return;
     case DrawCommandType::kDrawRectangle:
       startDrawing("rectangle");
       replaceQueue(delta_drawing::rectanglePath(path_points_, draw_offset_mm_,
@@ -286,14 +237,11 @@ private:
       break;
     case DrawCommandType::kDrawCircle: {
       startDrawing("circle");
-      const double radius_mm =
-          std::max(kDefaultCircleRadiusMm, std::abs(legacy_target_offset_mm_));
       circle_center_mm_ = {
-          circle_target_.x,
-          circle_target_.y,
-          circle_target_.z - draw_offset_mm_,
+          circle_reference_mm_.x,
+          circle_reference_mm_.y,
+          circle_reference_mm_.z - draw_offset_mm_,
       };
-      circle_radius_mm_ = radius_mm;
       circle_pending_ = true;
       waypoint_queue_.clear();
       enqueuePoint({circle_center_mm_.x + circle_radius_mm_,
@@ -301,7 +249,7 @@ private:
       enqueuePoint(current_point_);
       RCLCPP_INFO(get_logger(),
                   "Continuous circle queued: radius=%.2f mm at 1 kHz",
-                  radius_mm);
+                  circle_radius_mm_);
       break;
     }
     default:
@@ -314,15 +262,13 @@ private:
   }
 
   void setCurrentPoint(const Point &requested) {
-    current_point_ = requested;
-    if (current_point_.z > kWorkspaceMaxZMm ||
-        current_point_.z < kWorkspaceMinZMm) {
-      current_point_.z = kWorkspaceMaxZMm;
-      RCLCPP_WARN(get_logger(),
-                  "Invalid Z; current point clamped to (%.2f, %.2f, %.2f)",
-                  current_point_.x, current_point_.y, current_point_.z);
+    if (requested.z > kWorkspaceMaxZMm || requested.z < kWorkspaceMinZMm) {
+      RCLCPP_ERROR(get_logger(),
+                   "Current point rejected: Z %.2f is outside [%.2f, %.2f] mm",
+                   requested.z, kWorkspaceMinZMm, kWorkspaceMaxZMm);
       return;
     }
+    current_point_ = requested;
     RCLCPP_INFO(get_logger(), "Current point set to (%.2f, %.2f, %.2f)",
                 current_point_.x, current_point_.y, current_point_.z);
   }
@@ -359,21 +305,6 @@ private:
                 circle_radius_mm_);
   }
 
-  void finishLegacyCommand(bool success, const std::string &detail) {
-    if (!legacy_command_active_) {
-      return;
-    }
-
-    std_msgs::msg::String status;
-    status.data = success ? "Point [" + std::to_string(last_legacy_command_.x) +
-                                " " + std::to_string(last_legacy_command_.y) +
-                                " " + std::to_string(last_legacy_command_.z) +
-                                "] is finished"
-                          : "Point sequence failed: " + detail;
-    legacy_status_publisher_->publish(status);
-    legacy_command_active_ = false;
-  }
-
   void startDrawing(const std::string &name) {
     active_drawing_ = name;
     std_msgs::msg::String status;
@@ -395,24 +326,17 @@ private:
   }
 
   double draw_offset_mm_{20.0};
-  double legacy_target_offset_mm_{10.0};
   MotionKind motion_in_flight_{MotionKind::kNone};
-  bool legacy_command_active_{false};
   bool circle_pending_{false};
   double circle_radius_mm_{kDefaultCircleRadiusMm};
 
   std::deque<Point> waypoint_queue_;
   Point current_point_{0.0, 0.0, -375.0};
   std::array<Point, 4> path_points_;
-  Point circle_target_{-100.0, -100.0, -453.0};
+  Point circle_reference_mm_{-100.0, -100.0, -453.0};
   Point circle_center_mm_;
-  Point rectangle_target_{0.0, -100.0, -453.0};
-  Point triangle_target_{100.0, -100.0, -453.0};
-  Point last_legacy_command_;
   std::string active_drawing_;
 
-  rclcpp::Subscription<my_delta_robot::msg::Posicionxyz>::SharedPtr
-      legacy_point_subscription_;
   rclcpp::Subscription<my_delta_robot::msg::Posicionxyz>::SharedPtr
       draw_command_subscription_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr status_subscription_;
@@ -420,7 +344,6 @@ private:
       segment_publisher_;
   rclcpp::Publisher<my_delta_robot::msg::CircleXYZ>::SharedPtr
       circle_publisher_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr legacy_status_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr drawing_status_publisher_;
 };
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Archived ROS 1 camera experiment; not part of the active ROS 2 package."""
 import rospy
 import cv2
 import math

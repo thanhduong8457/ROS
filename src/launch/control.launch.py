@@ -1,27 +1,34 @@
 #!/usr/bin/env python3
-"""Launch the delta robot visualization and operator control panel."""
+"""Compatibility wrapper for the full delta-robot operator environment."""
 
 import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch_ros.actions import Node
+from launch.substitutions import LaunchConfiguration
 
 
 def generate_launch_description():
     package_share = get_package_share_directory("my_delta_robot")
-    display_launch = os.path.join(package_share, "launch", "display.launch.py")
+    bringup_launch = os.path.join(package_share, "launch", "bringup.launch.py")
+    use_sim_time = LaunchConfiguration("use_sim_time")
 
     return LaunchDescription(
         [
-            IncludeLaunchDescription(PythonLaunchDescriptionSource(display_launch)),
-            Node(
-                package="my_delta_robot",
-                executable="gui_user_interface_node.py",
-                name="gui_user_interface_node",
-                output="screen",
+            DeclareLaunchArgument(
+                "use_sim_time",
+                default_value="false",
+                description="Use simulation clock if true",
+            ),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(bringup_launch),
+                launch_arguments={
+                    "gui": "true",
+                    "rviz": "true",
+                    "use_sim_time": use_sim_time,
+                }.items(),
             ),
         ]
     )

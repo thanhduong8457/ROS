@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Archived ROS tutorial node; not part of the active runtime."""
 import rclpy
 from rclpy.node import Node
 
@@ -21,4 +22,3 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
-    

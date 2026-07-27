@@ -1,3 +1,5 @@
+"""Archived standalone camera experiment."""
+
 import cv2
 import time
 

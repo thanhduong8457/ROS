@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Archived launcher for the redundant initial-pose publisher."""
 from launch import LaunchDescription
 from launch_ros.actions import Node
 

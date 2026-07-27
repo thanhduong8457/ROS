@@ -1,3 +1,5 @@
+"""Archived standalone camera experiment."""
+
 import cv2
 import time
 import numpy as np
@@ -5,8 +7,6 @@ import numpy as np
 m = 1.0
 k1 = 0.0
 k2 = 0.0
-
-GSTREAMER_PIPELINE = 'nvarguscamerasrc ! video/x-raw(memory:NVMM), width=1920, height=1080, format=(string)NV12, framerate=21/1 ! nvvidconv flip-method=0 ! video/x-raw, width=960, height=616, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink wait-on-eos=false max-buffers=1 drop=True'
 
 def stackImages(scale,imgArray):
     rows = len(imgArray)
@@ -38,37 +38,35 @@ def stackImages(scale,imgArray):
         hor= np.hstack(imgArray)
         ver = hor
     return ver
-
+    
 def add_pos(a,b,c,d,arr,e):
     arr0 = []
-    arr0.append(float(a+c//2)*m-k1)
-    arr0.append((534.71-float(b+d//2))/(2.2492))
-    arr0.append(float(-420))
+    arr0.append(0.4585*(float(a+c//2)*m-k1)-212.2)
+    arr0.append(237.7-0.3897*(float(b+d//2)))
+    arr0.append(float(-450))
     arr0.append(float(e))
    #  if len(arr) == 0:
    #      arr.append(arr0)
     if arr0 not in arr:
         arr.append(arr0)
 
-def node():   
-   cap = cv2.VideoCapture(GSTREAMER_PIPELINE, cv2.CAP_GSTREAMER)
-   #cap = cv2.VideoCapture(0)
-   while True:
-       ret_val, img = cap.read()
-        
-       # img = cv2.imread(cap)
+GSTREAMER_PIPELINE = 'nvarguscamerasrc ! video/x-raw(memory:NVMM), width=1920, height=1080, format=(string)NV12, framerate=10/1 ! nvvidconv flip-method=0 ! video/x-raw, width=960, height=616, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink wait-on-eos=false max-buffers=1 drop=True'
+
+def show_camera():
+    # if video_capture.isOpened():
+    if True:
+       # ret_val, img = video_capture.read()
+       img = cv2.imread('../images/test.png')
+
        imgContour = img.copy()
        imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
        imgBlur = cv2.GaussianBlur(imgGray,(7,7),1)
        imgCanny = cv2.Canny(imgBlur,50,50)
-
-       # triangle = []  # 2
-       # square = []    # 1  
-       # circles = []   # 0
+       
        data = []
-
+       
        contours, hierarchy = cv2.findContours(imgCanny, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[-2:]
-
+       
        for cnt in contours:
           area = cv2.contourArea(cnt)
           objectType = " "
@@ -108,31 +106,24 @@ def node():
              cv2.circle(imgContour,(1900,1000),5,(55,255,120),cv2.FILLED)
              cv2.rectangle(imgContour,(x,y),(x+w,y+h),(0,255,0),2)
              cv2.putText(imgContour,objectType,(x+(w//2)-10,y+(h//2)-10), cv2.FONT_HERSHEY_COMPLEX,0.7, (0,0,0),2)
-             
+       
        k = len(data)
        print(k,data)
-    #    while not rospy.is_shutdown():
-    #       for i in range(k):
-    #          data_image = position_input()
-    #          data_image.image_data = data[i]
-    #          pub_image_data.publish(data_image)
-    #          rate.sleep()
-    #          print(i,data[i])
-    #          if(i == (k-1)):
-    #             return
+       
        imgBlank = np.zeros_like(img)      
        imgStack = stackImages(0.8,([img,imgGray,imgBlur],[imgCanny,imgContour,imgBlank]))
        img_ss = cv2.resize(imgStack, (960, 540))
-       cv2.imshow("window_name", img_ss)
-       #while True:
-       #  cv2.imshow("window_name", img_ss)
-       #  if cv2.waitKey(1) & 0xFF == ord('q'):
-       #      break
-       if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
 
-# cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
+       while True:
+         cv2.imshow("window_name", img_ss)
+         if cv2.waitKey(1) & 0xFF == ord('q'):
+           break
+    else:
+        print("Error: Unable to open camera")
+
+
 if __name__ == "__main__":
-    node()
-
-
+  # video_capture = cv2.VideoCapture(GSTREAMER_PIPELINE, cv2.CAP_GSTREAMER)
+  while True:
+    show_camera()
+      

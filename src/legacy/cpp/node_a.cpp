@@ -1,3 +1,4 @@
+// Archived ROS 1 image-pipeline experiment; not part of the active ROS 2 build.
 #include <iostream>
 #include <string>
 #include <vector>

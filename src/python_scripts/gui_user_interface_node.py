@@ -3,129 +3,33 @@
 
 from __future__ import annotations
 
-import ctypes
 import math
-import os
 import signal
-import shutil
 import sys
 import time
-
-
-def relaunch_with_ros_python() -> None:
-    """Use the Python interpreter that launched ros2 when another Python is active."""
-    ensure_ros_library_paths()
-    if os.environ.get("MY_DELTA_GUI_UI_REEXEC") == "1":
-        return
-
-    ros2_path = shutil.which("ros2")
-    if not ros2_path:
-        return
-    try:
-        with open(ros2_path, "r", encoding="utf-8") as ros2_file:
-            shebang = ros2_file.readline().strip()
-    except OSError:
-        return
-    if not shebang.startswith("#!"):
-        return
-
-    ros_python = shebang[2:].split()[0]
-    if not os.path.exists(ros_python) or os.path.realpath(
-        ros_python
-    ) == os.path.realpath(sys.executable):
-        return
-    os.environ["MY_DELTA_GUI_UI_REEXEC"] = "1"
-    os.execv(ros_python, [ros_python, __file__, *sys.argv[1:]])
-
-
-def get_ament_prefixes() -> list[str]:
-    return [
-        prefix
-        for prefix in os.environ.get("AMENT_PREFIX_PATH", "").split(os.pathsep)
-        if prefix
-    ]
-
-
-def ensure_ros_library_paths() -> None:
-    """Restore workspace library paths stripped from macOS shebang launches."""
-    lib_dirs = [
-        os.path.join(prefix, "lib")
-        for prefix in get_ament_prefixes()
-        if os.path.isdir(os.path.join(prefix, "lib"))
-    ]
-    for env_name in ("DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH"):
-        current = [path for path in os.environ.get(env_name, "").split(os.pathsep) if path]
-        merged: list[str] = []
-        for path in [*lib_dirs, *current]:
-            if path not in merged:
-                merged.append(path)
-        if merged:
-            os.environ[env_name] = os.pathsep.join(merged)
-
-
-def ensure_workspace_log_dir() -> None:
-    """Use the workspace log directory when ROS_LOG_DIR is not set."""
-    if os.environ.get("ROS_LOG_DIR"):
-        return
-    for prefix in get_ament_prefixes():
-        if os.path.basename(prefix) != "my_delta_robot":
-            continue
-        log_dir = os.path.join(os.path.dirname(os.path.dirname(prefix)), "log")
-        try:
-            os.makedirs(log_dir, exist_ok=True)
-        except OSError:
-            return
-        os.environ["ROS_LOG_DIR"] = log_dir
-        return
-
-
-def preload_ros_type_support_libraries() -> None:
-    """Load package dylibs before ROS requests them by name on macOS."""
-    if sys.platform != "darwin":
-        return
-    names = [
-        "libmy_delta_robot__rosidl_generator_c.dylib",
-        "libmy_delta_robot__rosidl_typesupport_c.dylib",
-        "libmy_delta_robot__rosidl_typesupport_fastrtps_c.dylib",
-        "libmy_delta_robot__rosidl_typesupport_introspection_c.dylib",
-        "libmy_delta_robot__rosidl_generator_py.dylib",
-    ]
-    load_mode = getattr(ctypes, "RTLD_GLOBAL", 0)
-    for prefix in get_ament_prefixes():
-        for name in names:
-            path = os.path.join(prefix, "lib", name)
-            if not os.path.exists(path):
-                continue
-            try:
-                ctypes.CDLL(path, mode=load_mode)
-            except OSError:
-                pass
-
-
-relaunch_with_ros_python()
-ensure_workspace_log_dir()
-preload_ros_type_support_libraries()
-
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import JointState
-from std_msgs.msg import String
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from my_delta_robot.msg import LinearSpeedXYZ, Posicionxyz, VmaxAmax
+from ros_bootstrap import prepare_ros_python_environment
+from ui_config import (
+    DEFAULT_AMAX,
+    DEFAULT_VMAX,
+    HOME_TCP_MM,
+    JOINT_STATE_TIMEOUT_SEC,
+    MAX_Z_MM,
+    MIN_Z_MM,
+    SHAPES_BY_KEY,
+    shape_message_type,
+)
 
+prepare_ros_python_environment(__file__)
 
-DEFAULT_VMAX = "5000.0"
-DEFAULT_AMAX = "100.0"
-HOME_TCP_MM = (0.0, 0.0, -375.0)
-MIN_Z_MM = -480.0
-MAX_Z_MM = -375.0
-SHAPES = {
-    "rectangle": ("Rectangle", 6, "Four straight sides"),
-    "triangle": ("Triangle", 7, "Three straight sides"),
-    "circle": ("Smooth Circle", 8, "Continuous curvature-limited path"),
-}
+import rclpy  # noqa: E402
+from rclpy.node import Node  # noqa: E402
+from sensor_msgs.msg import JointState  # noqa: E402
+from std_msgs.msg import String  # noqa: E402
+
+from my_delta_robot.msg import LinearSpeedXYZ, Posicionxyz, VmaxAmax  # noqa: E402
 
 
 class RobotControlNode(Node):
@@ -157,24 +61,52 @@ class RobotControlNode(Node):
         self.last_joint_update = time.monotonic()
 
     def _on_motion_status(self, msg: String) -> None:
+        is_done = msg.data.startswith("DONE")
+        is_failed = msg.data.startswith("FAILED:")
+        if not is_done and not is_failed:
+            self.events.append(("warning", f"Ignored motion status: {msg.data}"))
+            return
+
         if self.active_command == "manual":
-            if msg.data.startswith("DONE") and self.pending_manual_target is not None:
+            if is_done and self.pending_manual_target is not None:
                 self._publish_draw_current_point(self.pending_manual_target)
-            self.active_command = None
-            self.pending_manual_target = None
-            level = "error" if msg.data.startswith("FAILED:") else "success"
+            self.reset_command_tracking()
+            level = "error" if is_failed else "success"
             self.events.append((level, msg.data))
-        elif msg.data.startswith("FAILED:"):
+        elif is_failed:
             self.events.append(("error", msg.data))
 
+    @staticmethod
+    def _drawing_status_shape(status: str) -> str:
+        detail = status.partition(":")[2].strip()
+        return detail.split(" - ", maxsplit=1)[0]
+
     def _on_drawing_status(self, msg: String) -> None:
-        if msg.data.startswith("STARTED:") and self.active_command is None:
+        is_started = msg.data.startswith("STARTED:")
+        is_done = msg.data.startswith("DONE:")
+        is_failed = msg.data.startswith("FAILED:")
+        if not is_started and not is_done and not is_failed:
+            self.events.append(("warning", f"Ignored drawing status: {msg.data}"))
+            return
+
+        status_shape = self._drawing_status_shape(msg.data)
+        if is_started and self.active_command is None:
             self.active_command = "shape:external"
-        elif msg.data.startswith(("DONE:", "FAILED:")):
-            self.active_command = None
-        level = "error" if msg.data.startswith("FAILED:") else "success"
-        if msg.data.startswith("STARTED:"):
-            level = "info"
+        elif (is_done or is_failed) and (
+            self.active_command or ""
+        ).startswith("shape:"):
+            expected_shape = self.active_command.partition(":")[2]
+            if expected_shape != "external" and status_shape != expected_shape:
+                self.events.append(
+                    (
+                        "warning",
+                        f"Ignored {status_shape} status while waiting for "
+                        f"{expected_shape}",
+                    )
+                )
+                return
+            self.reset_command_tracking()
+        level = "info" if is_started else "error" if is_failed else "success"
         self.events.append((level, msg.data))
 
     def connection_state(self) -> tuple[bool, str]:
@@ -189,6 +121,38 @@ class RobotControlNode(Node):
             return False, "Waiting for " + ", ".join(dict.fromkeys(missing))
         return True, "ROS connected"
 
+    def joint_state_age(self) -> float | None:
+        if not self.has_joint_state:
+            return None
+        return max(0.0, time.monotonic() - self.last_joint_update)
+
+    def has_fresh_joint_state(
+        self, timeout_sec: float = JOINT_STATE_TIMEOUT_SEC
+    ) -> bool:
+        age = self.joint_state_age()
+        return age is not None and age <= timeout_sec
+
+    def joint_state_description(self) -> str:
+        age = self.joint_state_age()
+        if age is None:
+            return "waiting for TCP position"
+        if age > JOINT_STATE_TIMEOUT_SEC:
+            return f"TCP position stale ({age:.1f}s)"
+        return "TCP live"
+
+    def begin_command(
+        self,
+        command: str,
+        manual_target: tuple[float, float, float] | None = None,
+    ) -> None:
+        self.active_command = command
+        self.pending_manual_target = manual_target
+
+    def reset_command_tracking(self) -> None:
+        """Clear only this UI's bookkeeping; this does not cancel robot motion."""
+        self.active_command = None
+        self.pending_manual_target = None
+
     def publish_motion_limits(self, vmax: float, amax: float) -> None:
         msg = VmaxAmax()
         msg.vmax = vmax
@@ -196,11 +160,11 @@ class RobotControlNode(Node):
         self.motion_limits_pub.publish(msg)
 
     def publish_shape(self, shape_key: str) -> None:
-        _, shape_type, _ = SHAPES[shape_key]
+        shape = SHAPES_BY_KEY[shape_key]
         msg = Posicionxyz()
-        msg.type = shape_type
+        msg.type = shape_message_type(shape, Posicionxyz)
         self.shape_pub.publish(msg)
-        self.events.append(("info", f"Requested {SHAPES[shape_key][0].lower()}"))
+        self.events.append(("info", f"Requested {shape.label.lower()}"))
 
     def _publish_draw_current_point(
         self, position_mm: tuple[float, float, float]
@@ -208,7 +172,7 @@ class RobotControlNode(Node):
         """Keep draw_node's path origin aligned after a direct GUI move."""
         msg = Posicionxyz()
         msg.x0, msg.y0, msg.z0 = position_mm
-        msg.type = -1
+        msg.type = Posicionxyz.SET_CURRENT_POINT
         self.shape_pub.publish(msg)
 
     def publish_move(self, target_mm: tuple[float, float, float]) -> None:
@@ -218,7 +182,11 @@ class RobotControlNode(Node):
         msg.gripper = 0
         self.segment_pub.publish(msg)
         self.events.append(
-            ("info", f"Move to X={target_mm[0]:.1f}, Y={target_mm[1]:.1f}, Z={target_mm[2]:.1f} mm")
+            (
+                "info",
+                f"Move to X={target_mm[0]:.1f}, Y={target_mm[1]:.1f}, "
+                f"Z={target_mm[2]:.1f} mm",
+            )
         )
 
     def drain_events(self) -> list[tuple[str, str]]:
@@ -241,6 +209,7 @@ class RobotControlApp(ttk.Frame):
         self.target_vars = [tk.StringVar(value=f"{value:.1f}") for value in HOME_TCP_MM]
         self.jog_step_var = tk.StringVar(value="5")
         self.command_buttons: list[ttk.Button] = []
+        self.manual_buttons: list[ttk.Button] = []
 
         self.grid(row=0, column=0, sticky="nsew")
         root.columnconfigure(0, weight=1)
@@ -333,16 +302,18 @@ class RobotControlApp(ttk.Frame):
             wraplength=700,
         ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 14))
 
-        for column, (key, (label, _, description)) in enumerate(SHAPES.items()):
-            card = ttk.LabelFrame(tab, text=label, padding=12)
+        for column, (key, shape) in enumerate(SHAPES_BY_KEY.items()):
+            card = ttk.LabelFrame(tab, text=shape.label, padding=12)
             card.grid(row=1, column=column, sticky="nsew", padx=6)
             card.columnconfigure(0, weight=1)
-            ttk.Label(card, text=description, wraplength=180, anchor="center").grid(
+            ttk.Label(
+                card, text=shape.description, wraplength=180, anchor="center"
+            ).grid(
                 row=0, column=0, sticky="ew", pady=(0, 12)
             )
             button = ttk.Button(
                 card,
-                text=f"Draw {label}",
+                text=f"Draw {shape.label}",
                 style="Primary.TButton",
                 command=lambda shape=key: self._start_shape(shape),
             )
@@ -366,7 +337,10 @@ class RobotControlApp(ttk.Frame):
                 style="Position.TLabel",
                 anchor="center",
             ).grid(row=1, column=column, sticky="ew", pady=(4, 0))
-        ttk.Button(position, text="Copy to Target", command=self._copy_current_to_target).grid(
+        copy_button = ttk.Button(
+            position, text="Copy to Target", command=self._copy_current_to_target
+        )
+        copy_button.grid(
             row=2, column=0, columnspan=3, pady=(10, 0), sticky="ew"
         )
 
@@ -385,6 +359,7 @@ class RobotControlApp(ttk.Frame):
         home_button = ttk.Button(target, text="Return Home", command=self._return_home)
         home_button.grid(row=4, column=0, columnspan=2, sticky="ew")
         self.command_buttons.extend((move_button, home_button))
+        self.manual_buttons.extend((copy_button, move_button, home_button))
 
         jog = ttk.LabelFrame(tab, text="Incremental Jog", padding=12)
         jog.grid(row=1, column=0, columnspan=2, sticky="ew")
@@ -414,6 +389,7 @@ class RobotControlApp(ttk.Frame):
             button.grid(row=1, column=column, sticky="ew", padx=3, pady=(10, 0))
             jog.columnconfigure(column, weight=1)
             self.command_buttons.append(button)
+            self.manual_buttons.append(button)
 
     def _build_activity_log(self) -> None:
         frame = ttk.LabelFrame(self, text="Activity", padding=8)
@@ -425,8 +401,13 @@ class RobotControlApp(ttk.Frame):
         self.activity_text.grid(row=0, column=0, sticky="ew")
         scrollbar.grid(row=0, column=1, sticky="ns")
         ttk.Label(frame, textvariable=self.activity_var, anchor="w").grid(
-            row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0)
+            row=1, column=0, sticky="ew", pady=(6, 0)
         )
+        self.recovery_button = ttk.Button(
+            frame, text="Recover UI Lock", command=self._recover_ui_lock
+        )
+        self.recovery_button.grid(row=1, column=1, sticky="e", padx=(8, 0), pady=(6, 0))
+        self.recovery_button.configure(state="disabled")
         self._append_log("info", "Control panel ready")
 
     def _schedule_ros_spin(self) -> None:
@@ -436,14 +417,24 @@ class RobotControlApp(ttk.Frame):
 
     def _refresh_ui(self) -> None:
         connected, connection_text = self.node.connection_state()
-        self.connection_var.set(("● " if connected else "○ ") + connection_text)
+        position_fresh = self.node.has_fresh_joint_state()
+        connection_details = (
+            f"{connection_text} • {self.node.joint_state_description()}"
+            if connected
+            else connection_text
+        )
+        self.connection_var.set(("● " if connected else "○ ") + connection_details)
         self.connection_label.configure(
             style="Connected.TLabel" if connected else "Disconnected.TLabel"
         )
 
-        if self.node.has_joint_state:
+        if position_fresh:
             for variable, value in zip(self.position_vars, self.node.tcp_mm):
                 variable.set(f"{value:8.2f}")
+        else:
+            stale_text = "WAIT" if not self.node.has_joint_state else "STALE"
+            for variable in self.position_vars:
+                variable.set(stale_text)
 
         for level, message in self.node.drain_events():
             self._append_log(level, message)
@@ -452,6 +443,11 @@ class RobotControlApp(ttk.Frame):
         busy = self.node.active_command is not None
         for button in self.command_buttons:
             button.configure(state="disabled" if busy else "normal")
+        for button in self.manual_buttons:
+            button.configure(
+                state="normal" if position_fresh and not busy else "disabled"
+            )
+        self.recovery_button.configure(state="normal" if busy else "disabled")
         if busy and not self.activity_var.get().startswith("Busy"):
             self.activity_var.set("Busy — waiting for motion completion")
 
@@ -459,7 +455,12 @@ class RobotControlApp(ttk.Frame):
 
     def _append_log(self, level: str, message: str) -> None:
         timestamp = time.strftime("%H:%M:%S")
-        prefix = {"success": "OK", "error": "ERROR", "info": "INFO"}.get(level, "INFO")
+        prefix = {
+            "success": "OK",
+            "error": "ERROR",
+            "warning": "WARN",
+            "info": "INFO",
+        }.get(level, "INFO")
         self.activity_text.configure(state="normal")
         self.activity_text.insert("end", f"[{timestamp}] {prefix}: {message}\n")
         self.activity_text.see("end")
@@ -491,6 +492,12 @@ class RobotControlApp(ttk.Frame):
         limits = self._read_limits()
         if limits is None:
             return False
+        if self.node.motion_limits_pub.get_subscription_count() == 0:
+            messagebox.showerror(
+                "main_node unavailable",
+                "Motion limits were not sent because main_node is not connected.",
+            )
+            return False
         self.node.publish_motion_limits(*limits)
         if announce:
             message = f"Limits applied: {limits[0]:g} mm/s, {limits[1]:g} mm/s²"
@@ -503,22 +510,34 @@ class RobotControlApp(ttk.Frame):
         self.amax_var.set(f"{acceleration:g}")
         self._apply_limits()
 
-    def _confirm_ready(self) -> bool:
+    def _confirm_ready(self, require_fresh_position: bool = False) -> bool:
         if self.node.active_command is not None:
             messagebox.showwarning("Robot busy", "Wait for the current command to finish.")
             return False
         connected, details = self.node.connection_state()
         if not connected:
-            return messagebox.askyesno(
-                "ROS nodes not ready", f"{details}.\n\nSend the command anyway?"
+            messagebox.showerror(
+                "ROS nodes not ready",
+                f"{details}. Start the required nodes before sending a command.",
             )
+            return False
+        if require_fresh_position and not self.node.has_fresh_joint_state():
+            messagebox.showwarning(
+                "TCP position unavailable",
+                (
+                    f"Cannot move because the {self.node.joint_state_description()}. "
+                    "Wait for fresh /joint_states data."
+                ),
+            )
+            return False
         return True
 
     def _start_shape(self, shape_key: str) -> None:
         if not self._confirm_ready() or not self._apply_limits(announce=False):
             return
-        self.node.active_command = f"shape:{shape_key}"
-        self.activity_var.set(f"Starting {SHAPES[shape_key][0].lower()}...")
+        shape = SHAPES_BY_KEY[shape_key]
+        self.node.begin_command(f"shape:{shape_key}")
+        self.activity_var.set(f"Starting {shape.label.lower()}...")
         self.root.after(150, lambda: self.node.publish_shape(shape_key))
 
     def _target_values(self) -> tuple[float, float, float] | None:
@@ -545,14 +564,9 @@ class RobotControlApp(ttk.Frame):
         target = self._target_values()
         if (
             target is None
-            or not self._confirm_ready()
+            or not self._confirm_ready(require_fresh_position=True)
             or not self._apply_limits(announce=False)
         ):
-            return
-        if not self.node.has_joint_state:
-            messagebox.showwarning(
-                "Position unavailable", "Wait for the live TCP position before moving."
-            )
             return
         if all(
             abs(current - desired) < 1e-6
@@ -560,14 +574,19 @@ class RobotControlApp(ttk.Frame):
         ):
             messagebox.showinfo("Already at target", "The robot is already at this position.")
             return
-        self.node.active_command = "manual"
-        self.node.pending_manual_target = target
+        self.node.begin_command("manual", target)
         self.activity_var.set("Sending Cartesian move...")
         self.root.after(150, lambda: self._dispatch_move(target))
 
     def _copy_current_to_target(self) -> None:
-        if not self.node.has_joint_state:
-            messagebox.showwarning("Position unavailable", "No joint state has been received yet.")
+        if not self.node.has_fresh_joint_state():
+            messagebox.showwarning(
+                "Position unavailable",
+                (
+                    f"Cannot copy because the {self.node.joint_state_description()}. "
+                    "Wait for fresh /joint_states data."
+                ),
+            )
             return
         for variable, value in zip(self.target_vars, self.node.tcp_mm):
             variable.set(f"{value:.2f}")
@@ -578,9 +597,13 @@ class RobotControlApp(ttk.Frame):
         self._move_to_target()
 
     def _jog(self, axis: int, direction: int) -> None:
-        if not self.node.has_joint_state:
+        if not self.node.has_fresh_joint_state():
             messagebox.showwarning(
-                "Position unavailable", "Wait for the live TCP position before jogging."
+                "Position unavailable",
+                (
+                    f"Cannot jog because the {self.node.joint_state_description()}. "
+                    "Wait for fresh /joint_states data."
+                ),
             )
             return
         step = float(self.jog_step_var.get())
@@ -589,6 +612,25 @@ class RobotControlApp(ttk.Frame):
         for variable, value in zip(self.target_vars, target):
             variable.set(f"{value:.2f}")
         self._move_to_target()
+
+    def _recover_ui_lock(self) -> None:
+        if self.node.active_command is None:
+            return
+        confirmed = messagebox.askyesno(
+            "Recover local UI lock",
+            (
+                "This only clears the control panel's local busy state. It does not "
+                "stop or cancel robot motion.\n\nVerify main_node and draw_node are "
+                "idle before continuing. Clear the local UI lock?"
+            ),
+        )
+        if not confirmed:
+            return
+        previous_command = self.node.active_command
+        self.node.reset_command_tracking()
+        message = f"Cleared local UI lock for {previous_command}; no robot cancel was sent"
+        self._append_log("warning", message)
+        self.activity_var.set(message)
 
 
 def main() -> int:

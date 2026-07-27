@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Archived ROS 1 camera pipeline experiment."""
 import rospy
 import cv2
 

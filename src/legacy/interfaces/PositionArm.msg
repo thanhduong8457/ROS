@@ -1,3 +1,4 @@
+# Archived interface from the serial hardware experiment.
 float64 base_brazo1
 float64 base_brazo2
 float64 base_brazo3

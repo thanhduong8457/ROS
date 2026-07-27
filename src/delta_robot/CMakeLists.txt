@@ -1,6 +1,6 @@
 set(LIBRARY_NAME delta_robot)
 
-add_library(${LIBRARY_NAME} SHARED
+add_library(${LIBRARY_NAME} STATIC
   delta_robot.cpp
 )
 

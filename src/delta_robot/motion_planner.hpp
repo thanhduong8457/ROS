@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <limits>
 #include <string>
 #include <vector>
 
@@ -51,14 +50,7 @@ public:
       result.error = "Start and target coordinates must be finite";
       return result;
     }
-    if (!std::isfinite(sample_period_s) || sample_period_s <= 0.0) {
-      result.error = "Sample period must be positive";
-      return result;
-    }
-    if (!std::isfinite(limits.max_velocity_mps) ||
-        !std::isfinite(limits.max_acceleration_mps2) ||
-        limits.max_velocity_mps <= 0.0 || limits.max_acceleration_mps2 <= 0.0) {
-      result.error = "Velocity and acceleration limits must be positive";
+    if (!validateRequest(limits, sample_period_s, result.error)) {
       return result;
     }
 
@@ -76,18 +68,11 @@ public:
     result.duration_s = timing.total_time_s;
     result.triangular = timing.triangular;
 
-    if (!std::isfinite(timing.total_time_s)) {
-      result.error = "Trajectory duration is not finite";
+    std::size_t step_count = 0;
+    if (!computeStepCount(timing.total_time_s, sample_period_s, step_count,
+                          result.error)) {
       return result;
     }
-
-    const double requested_steps =
-        std::ceil(timing.total_time_s / sample_period_s);
-    if (!std::isfinite(requested_steps) || requested_steps > kMaxStepCount) {
-      result.error = "Trajectory requires too many samples";
-      return result;
-    }
-    const auto step_count = static_cast<std::size_t>(requested_steps);
     result.samples.reserve(step_count + 1U);
 
     for (std::size_t i = 0; i <= step_count; ++i) {
@@ -142,14 +127,7 @@ public:
       result.error = "Circle radius must be positive";
       return result;
     }
-    if (!std::isfinite(sample_period_s) || sample_period_s <= 0.0) {
-      result.error = "Sample period must be positive";
-      return result;
-    }
-    if (!std::isfinite(limits.max_velocity_mps) ||
-        !std::isfinite(limits.max_acceleration_mps2) ||
-        limits.max_velocity_mps <= 0.0 || limits.max_acceleration_mps2 <= 0.0) {
-      result.error = "Velocity and acceleration limits must be positive";
+    if (!validateRequest(limits, sample_period_s, result.error)) {
       return result;
     }
 
@@ -167,14 +145,12 @@ public:
     result.duration_s = timing.total_time_s;
     result.triangular = timing.triangular;
 
-    const double requested_steps =
-        std::ceil(timing.total_time_s / sample_period_s);
-    if (!std::isfinite(requested_steps) || requested_steps > kMaxStepCount) {
-      result.error = "Trajectory requires too many samples";
+    std::size_t step_count = 0;
+    if (!computeStepCount(timing.total_time_s, sample_period_s, step_count,
+                          result.error)) {
       return result;
     }
 
-    const auto step_count = static_cast<std::size_t>(requested_steps);
     const double direction = clockwise ? -1.0 : 1.0;
     result.samples.reserve(step_count + 1U);
 
@@ -230,7 +206,40 @@ public:
 
 private:
   static constexpr double kEpsilon = 1e-9;
-  static constexpr double kMaxStepCount = 1'000'000.0;
+  static constexpr std::size_t kMaxStepCount = 1'000'000;
+
+  static bool validateRequest(const MotionLimits &limits,
+                              double sample_period_s, std::string &error) {
+    if (!std::isfinite(sample_period_s) || sample_period_s <= 0.0) {
+      error = "Sample period must be positive";
+      return false;
+    }
+    if (!std::isfinite(limits.max_velocity_mps) ||
+        !std::isfinite(limits.max_acceleration_mps2) ||
+        limits.max_velocity_mps <= 0.0 || limits.max_acceleration_mps2 <= 0.0) {
+      error = "Velocity and acceleration limits must be positive";
+      return false;
+    }
+    return true;
+  }
+
+  static bool computeStepCount(double duration_s, double sample_period_s,
+                               std::size_t &step_count, std::string &error) {
+    if (!std::isfinite(duration_s)) {
+      error = "Trajectory duration is not finite";
+      return false;
+    }
+
+    const double requested_steps = std::ceil(duration_s / sample_period_s);
+    if (!std::isfinite(requested_steps) ||
+        requested_steps > static_cast<double>(kMaxStepCount)) {
+      error = "Trajectory requires too many samples";
+      return false;
+    }
+
+    step_count = static_cast<std::size_t>(requested_steps);
+    return true;
+  }
 
   static bool isFinitePoint(const Point &point) {
     return std::isfinite(point.x) && std::isfinite(point.y) &&

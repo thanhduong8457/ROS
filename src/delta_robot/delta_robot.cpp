@@ -1,751 +1,213 @@
 #include "delta_robot.h"
-#include "joint_state_config.hpp"
-#include <iostream>
 
-/// @brief 
-/// @param  
-delta_robot::delta_robot(void) {
-    initialize();
+#include <algorithm>
+#include <cmath>
+
+namespace {
+
+constexpr double kSingularityTolerance = 1e-12;
+constexpr double kDiscriminantTolerance = 1e-12;
+
+bool isFinite(const Point &point) {
+  return std::isfinite(point.x) && std::isfinite(point.y) &&
+         std::isfinite(point.z);
 }
 
-/// @brief 
-/// @param  
-delta_robot::~delta_robot(void) {
-    m_data_delta.clear();
+bool isFinite(const Theta &theta) {
+  return std::isfinite(theta.angle1) && std::isfinite(theta.angle2) &&
+         std::isfinite(theta.angle3);
 }
 
-/// @brief 
-/// @param  
-void delta_robot::initialize(void) {
-    A1[0] = (hf * mmtm) / 3;
-    A1[1] = 0;
-    A1[2] = 0;
-    A2[0] = -A1[0] * std::cos(60 * dtr);
-    A2[1] = -A1[0] * std::sin(60 * dtr);
-    A2[2] = 0;
-    A3[0] = A2[0];
-    A3[1] = -A2[1];
-    A3[2] = 0;
-    this->vmax = 5000;
-    this->amax = 100;
-    this->mResolution = 120;
-    m_data_delta.clear();
-}
+} // namespace
 
-/// @brief 
-/// @param point0 
-/// @param pointf 
-/// @return 
-Point delta_robot::unit_vector(Point point0, Point pointf) {
-    Point return_point;
-    double denta_x = pointf.x - point0.x;
-    double denta_y = pointf.y - point0.y;
-    double denta_z = pointf.z - point0.z;
-
-    double modulo = std::sqrt(denta_x * denta_x + denta_y * denta_y + denta_z * denta_z);
-
-    return_point.x = denta_x / modulo;
-    return_point.y = denta_y / modulo;
-    return_point.z = denta_z / modulo;
-    return return_point;
-}
-
-/// @brief 
-/// @param mStartPoint 
-/// @param mEndPoint 
-/// @param dis 
-/// @param rot_z 
-/// @param rot_y 
-/// @param theta_y 
-/// @param theta_z 
-/// @param rot_tras 
-void delta_robot::system_linear(void) {
-    m_data_delta.clear();
-    for (auto& row : rot_z) {
-        for (double& value : row) {
-            value = 0.0;
-        }
-    }
-    for (auto& row : rot_y) {
-        for (double& value : row) {
-            value = 0.0;
-        }
-    }
-    for (auto& row : rot_tras) {
-        for (double& value : row) {
-            value = 0.0;
-        }
-    }
-
-    double xoo = mStartPoint.x * mmtm;
-    double yoo = mStartPoint.y * mmtm;
-    double zoo = mStartPoint.z * mmtm;
-
-    double xff = mEndPoint.x * mmtm;
-    double yff = mEndPoint.y * mmtm;
-    double zff = mEndPoint.z * mmtm;
-
-    double pf[3] = {0, 0, 0};
-    double pf_trans[4] = {0, 0, 0, 0};
-    double x_trans[4] = {0, 0, 0, 0};
-
-    // Traslacion(Xo, Yo, Zo)
-    rot_tras[0][0] = 1;
-    rot_tras[1][1] = 1;
-    rot_tras[2][2] = 1;
-    rot_tras[3][3] = 1;
-    rot_tras[0][3] = -xoo;
-    rot_tras[1][3] = -yoo;
-    rot_tras[2][3] = -zoo;
-    //[1  0  0 -xoo]
-    //[0  1  0 -yoo]
-    //[0  0  1 -zoo]
-    //[0  0  0   1 ]
-
-    // Traslacion(Xf, Yf, Zf)
-    pf_trans[0] = xff;
-    pf_trans[1] = yff;
-    pf_trans[2] = zff;
-    pf_trans[3] = 1;
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            x_trans[i] += rot_tras[i][j] * pf_trans[j];
-        }
-    }
-
-    Point my_unit_vector;
-    Point temp_point;
-    Point temp_point1;
-    temp_point.init();
-    temp_point1.init();
-    temp_point1.x = x_trans[0];
-    temp_point1.y = x_trans[1];
-    temp_point1.z = x_trans[2];
-    my_unit_vector = unit_vector(temp_point, temp_point1);
-    angle_rotation(my_unit_vector);
-
-    double cos_axisz = std::cos(this->theta_y);
-    double sin_axisz = std::sin(this->theta_y);
-
-    double cos_axisy = std::cos(this->theta_z);
-    double sin_axisy = std::sin(this->theta_z);
-
-    pf[0] = x_trans[0];
-    pf[1] = x_trans[1];
-    pf[2] = x_trans[2];
-
-    rot_z[0][0] = cos_axisz;
-    rot_z[0][1] = sin_axisz;
-    rot_z[1][0] = -1 * sin_axisz;
-    rot_z[1][1] = cos_axisz;
-    rot_z[2][2] = 1;
-
-    double m_rot1[3] = {};
-    double m_rot2[3] = {};
-
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            m_rot1[i] += rot_z[i][j] * pf[j];
-        }
-    }
-
-    rot_y[0][0] = cos_axisy;
-    rot_y[0][2] = sin_axisy;
-    rot_y[1][1] = 1;
-    rot_y[2][0] = -sin_axisy;
-    rot_y[2][2] = cos_axisy;
-
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            m_rot2[i] += rot_y[i][j] * m_rot1[j];
-        }
-    }
-
-    dis = m_rot2[0] * mtmm;
-    theta_z = theta_z * rtd;
-    theta_y = theta_y * rtd;
-}
-
-/// @brief 
-/// @param nx 
-/// @param ny 
-/// @param nz 
-/// @param theta_z 
-/// @param theta_y 
-void delta_robot::angle_rotation(Point unit_vector) {
-    if (unit_vector.z < 0) {
-        theta_z = (360 * dtr) + std::asin(unit_vector.z);
-    } else {
-        theta_z = std::asin(unit_vector.z);
-    }
-
-    if (unit_vector.x < 0) {
-        theta_y = (180 * dtr) + std::atan(unit_vector.y / unit_vector.x);
-    } else if (unit_vector.x == 0) {
-        if (unit_vector.y < 0) {
-            theta_y = 270 * dtr;
-        } else if (unit_vector.y == 0) {
-            theta_y = 0;
-        } else {
-            theta_y = 90 * dtr;
-        }
-    } else {
-        if (unit_vector.y < 0) {
-            theta_y = (360 * dtr) + std::atan(unit_vector.y / unit_vector.x);
-        } else {
-            theta_y = std::atan(unit_vector.y / unit_vector.x);
-        }
-    }
-}
-
-// /// @brief 
-// /// @param x0 
-// /// @param y0 
-// /// @param z0 
-// /// @return 
-// double delta_robot::delta_calcAngleYZ(double x0, double y0, double z0) {
-//     double y1 = -0.5 * 0.57735 * ff; // f/2 * tg 30
-//     y0 -= 0.5 * 0.57735 * ee;        // shift center to edge
-//                                      // z = a + b*y
-//     double a = (x0 * x0 + y0 * y0 + z0 * z0 + rf * rf - re * re - y1 * y1) / (2 * z0);
-//     double b = (y1 - y0) / z0;
-
-//     // discriminant
-//     double d = -(a + b * y1) * (a + b * y1) + rf * (b * b * rf + rf);
-//     if (d < 0) {
-//         return -1; // non-existing point
-//     }
-//     double yj = (y1 - a * b - sqrt(d)) / (b * b + 1); // choosing outer point
-//     double zj = a + b * yj;
-//     double theta = 180.0 * atan(-zj / (y1 - yj)) / pi + ((yj > y1) ? 180.0 : 0.0);
-//     return theta;
-// }
-
-/// @brief 
-/// @param  
-void delta_robot::TrapezoidalVelocityProfile(void) {
-    m_data_delta.clear();
-    if (mResolution == 0 || dis <= 0.0 || vmax <= 0.0 || amax <= 0.0) {
-        return;
-    }
-
-    const double distance_m = dis * mmtm;
-    const auto limits = motion_limits();
-    const double sample_period_s =
-        std::max(0.001, distance_m / static_cast<double>(mResolution) / limits.max_velocity_mps);
-
-    Point start;
-    Point target(distance_m, 0.0, 0.0);
-    delta_motion::CartesianTrajectoryGenerator generator;
-    const auto plan = generator.planLine(start, target, limits, sample_period_s);
-    if (!plan.ok) {
-        return;
-    }
-
-    m_data_delta.reserve(plan.samples.size());
-    for (const auto& sample : plan.samples) {
-        auto data = std::make_unique<data_delta_t>();
-        data->pos = sample.path_position_m;
-        data->position_val.init();
-        data->theta_val.init();
-        data->acel = sample.path_acceleration_mps2;
-        data->vel = sample.path_velocity_mps;
-        data->time_point = sample.time_s;
-        m_data_delta.push_back(std::move(data));
-    }
-}
-
-/// @brief 
-/// @param q0 
-/// @param dis 
-/// @param vmax 
-/// @param amax 
-/// @param tactual 
-/// @param q_actual 
-/// @param v_actual 
-/// @param a_actual 
-void delta_robot::ls_v_a_puntual(
-    double q0, 
-    double q1,
-    double tactual, 
-    double &q_actual, 
-    double &v_actual, 
-    double &a_actual
-) {
-    double tau = this->vmax / this->amax;
-
-    double T;
-    int s = 0;
-
-    if (q1 - q0 > 0) {
-        s = 1;
-    }
-    else if (q1 - q0 < 0) {
-        s = -1;
-    }
-
-    T = s * (q1 - q0) / vmax + tau;
-
-    double timer1 = tau;
-    double timer2 = T - tau;
-    double timer3 = T;
-
-    if ((0 <= tactual) && (tactual <= timer1)) {
-        q_actual = (q0) + ((s) * (amax / 2) * (tactual * tactual));
-        v_actual = s * amax * tactual;
-        a_actual = s * amax;
-    }
-    else if ((timer1 < tactual) && (tactual <= timer2)) {
-        q_actual = (q0) - ((s) * ((vmax * vmax) / (2 * amax))) + (s * vmax * tactual);
-        v_actual = s * vmax;
-        a_actual = 0;
-    }
-    else if ((timer2 < tactual) && (tactual <= timer3)) {
-        q_actual = (q1) + ((s) * ((-1 * ((amax * (T * T)) / (2))) + (amax * T * tactual) + (-1 * (amax / 2) * (tactual * tactual))));
-        v_actual = s * ((amax * T) - (amax * tactual));
-        a_actual = s * (-1 * amax);
-    }
-    else {
-        q_actual = 0;
-        v_actual = 0;
-        a_actual = 0;
-    }
-}
-
-/// @brief 
-/// @param  
-void delta_robot::system_linear_matrix(void) {
-    theta_y = theta_y * dtr;
-    theta_z = theta_z * dtr;
-    double xyz_res[4] = {0, 0, 0, 0};
-    
-    for (size_t i = 0; i < m_data_delta.size(); i++) {
-        for (int u = 0; u < 4; u++) {
-            xyz_res[u] = 0; // init the array
-        }
-        system_linear_invese(m_data_delta[i]->pos, xyz_res);
-
-        m_data_delta[i]->position_val.x = xyz_res[0];
-        m_data_delta[i]->position_val.y = xyz_res[1];
-        m_data_delta[i]->position_val.z = xyz_res[2];
-        // cout << "x=" << xyz_res[0] << ", y=" << xyz_res[1] << ", z=" << xyz_res[2] << endl;
-        
-        // // ######  velocidad xyz  ########## 未来用
-        // system_linear_invese(m_data_delta[i]->vel, rot_z, rot_y, theta_y, theta_z, rot_tras, xyz_res);
-        // m_data_delta[i]->vel_x = xyz_res[0][0];
-        // m_data_delta[i]->vel_y = xyz_res[1][0];
-        // m_data_delta[i]->vel_z = xyz_res[2][0];
-
-        // // ######  aceleracion xyz  ########## 未来用
-        // system_linear_invese(m_data_delta[i]->acel, rot_z, rot_y, theta_y, theta_z, rot_tras, xyz_res);
-        // m_data_delta[i]->acel_x = xyz_res[0][0];
-        // m_data_delta[i]->acel_y = xyz_res[1][0];
-        // m_data_delta[i]->acel_z = xyz_res[2][0];
-    }
-}
-
-/// @brief 
-/// @param xprima 
-/// @param rot_z 
-/// @param rot_y 
-/// @param theta_y 
-/// @param theta_z 
-/// @param m_trans 
-/// @param xyz_res 
-void delta_robot::system_linear_invese(double xprima, double (&xyz_res)[4]) {
-    double pf_invese[3] = {};
-    double pf_trans_invese[4] = {};
-    double m_trans_invese[4][4] = {};
-    // ######   Rotacion Y  ######
-    pf_invese[0] = xprima;
-    pf_invese[1] = 0;
-    pf_invese[2] = 0;
-
-    double rot_y_tras[3][3] = {};
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            rot_y_tras[j][i] = rot_y[i][j];
-        }
-    }
-
-    double m_rot1_invese[3] = {};
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            m_rot1_invese[i] += rot_y_tras[i][j] * pf_invese[j];
-        }
-    }
-    // ######   Rotacion Z  ######
-    double rot_z_tras[3][3] = {};
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            rot_z_tras[j][i] = rot_z[i][j];
-        }
-    }
-
-    double m_rot2_invese[3] = {};
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            m_rot2_invese[i] += rot_z_tras[i][j] * m_rot1_invese[j];
-        }
-    }
-
-    pf_trans_invese[0] = m_rot2_invese[0];
-    pf_trans_invese[1] = m_rot2_invese[1];
-    pf_trans_invese[2] = m_rot2_invese[2];
-    pf_trans_invese[3] = 1;
-
-    m_trans_invese[0][3] = -1 * rot_tras[0][3];
-    m_trans_invese[1][3] = -1 * rot_tras[1][3];
-    m_trans_invese[2][3] = -1 * rot_tras[2][3];
-    m_trans_invese[0][0] = 1;
-    m_trans_invese[1][1] = 1;
-    m_trans_invese[2][2] = 1;
-    m_trans_invese[3][3] = 1;
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            xyz_res[i] += m_trans_invese[i][j] * pf_trans_invese[j];
-        }
-    }
-}
-
-// /// @brief 
-// /// @param mStartPoint 
-// /// @return 
-// double delta_robot::CalculateAngleYZ(Point mStartPoint) {
-//     double y1 = -0.5 * 0.57735 * ff; // f/2 * tg 30
-//     mStartPoint.y -= 0.5 * 0.57735 * ee; // shift center to edge
-//                                      // z = a + b*y
-//     double a = (mStartPoint.x * mStartPoint.x + mStartPoint.y * mStartPoint.y + mStartPoint.z * mStartPoint.z + rf * rf - re * re - y1 * y1) / (2 * mStartPoint.z);
-//     double b = (y1 - mStartPoint.y) / mStartPoint.z;
-
-//     // discriminant
-//     double d = -(a + b * y1) * (a + b * y1) + rf * (b * b * rf + rf);
-//     if (d < 0) {
-//         return 0; // non-existing point
-//     }
-//     double yj = (y1 - a * b - sqrt(d)) / (b * b + 1); // choosing outer point
-//     double zj = a + b * yj;
-//     double theta = 180.0 * atan(-zj / (y1 - yj)) / pi + ((yj > y1) ? 180.0 : 0.0);
-//     return theta;
-// }
-
-/// @brief 
-/// @param  
-void delta_robot::inverse_all_joint_state_exist(void) {
-    for (size_t i = 0; i < m_data_delta.size(); i++) {
-        m_data_delta[i]->theta_val = inverse(m_data_delta[i]->position_val);
-    }
-}
-
-/// @brief 
-/// @param vmax 
-/// @param amax 
-void delta_robot::set_vmax_amax(double vmax, double amax) {
-    this->vmax = vmax;
-    this->amax = amax;
-}
-
-/// @brief 
-/// @param vmax 
-/// @param amax 
-void delta_robot::set_resolution(unsigned int resolution) {
-    this->mResolution = resolution;
-}
-
-delta_motion::MotionLimits delta_robot::motion_limits() const {
-    return {vmax * mmtm, amax * mmtm};
-}
-
-unsigned int delta_robot::resolution() const {
-    return mResolution;
-}
-
-/// @brief 
-/// @param mStartPoint 
-/// @return 
-Theta delta_robot::inverse(Point point) {
-    return inverse_checked(point).theta;
-}
-
-delta_robot::IkResult delta_robot::inverse_checked(Point point) {
-    IkResult result;
-    Theta theta;
-    Point point_temp;
-
-    // Rotacion(0, 120, 240)
-    if (!angle_yz(point, theta.angle2)) {
-        result.error = "IK failed for arm 2";
-        return result;
-    }
-
-    point_temp.x = point.x * cos120 + point.y * sin120;
-    point_temp.y = point.y * cos120 - point.x * sin120;
-    point_temp.z = point.z;
-    if (!angle_yz(point_temp, theta.angle3)) {
-        result.error = "IK failed for arm 3";
-        return result;
-    }
-
-    point_temp.x = point.x * cos120 - point.y * sin120;
-    point_temp.y = point.y * cos120 + point.x * sin120;
-    point_temp.z = point.z;
-    if (!angle_yz(point_temp, theta.angle1)) {
-        result.error = "IK failed for arm 1";
-        return result;
-    }
-
-    result.ok = true;
-    result.theta = theta;
+DeltaRobot::IkResult DeltaRobot::inverseChecked(const Point &point_m) const {
+  IkResult result;
+  if (!isFinite(point_m)) {
+    result.error = "IK point coordinates must be finite";
     return result;
+  }
+
+  Theta theta;
+  Point rotated_point;
+
+  if (!angleYz(point_m, theta.angle2)) {
+    result.error = "IK failed for arm 2";
+    return result;
+  }
+
+  rotated_point.x = point_m.x * cos120 + point_m.y * sin120;
+  rotated_point.y = point_m.y * cos120 - point_m.x * sin120;
+  rotated_point.z = point_m.z;
+  if (!angleYz(rotated_point, theta.angle3)) {
+    result.error = "IK failed for arm 3";
+    return result;
+  }
+
+  rotated_point.x = point_m.x * cos120 - point_m.y * sin120;
+  rotated_point.y = point_m.y * cos120 + point_m.x * sin120;
+  rotated_point.z = point_m.z;
+  if (!angleYz(rotated_point, theta.angle1)) {
+    result.error = "IK failed for arm 1";
+    return result;
+  }
+
+  result.ok = true;
+  result.theta = theta;
+  return result;
 }
 
-/// @brief 
-/// @param x0 
-/// @param y0 
-/// @param z0 
-/// @param theta 
-/// @return 
-double delta_robot::angle_yz(Point point) {
-    double theta = 0.0;
-    if (!angle_yz(point, theta)) {
-        return 1.0;
-    }
-    return theta;
+bool DeltaRobot::angleYz(Point point_m, double &theta_deg) {
+  theta_deg = 0.0;
+  if (!isFinite(point_m) || std::abs(point_m.z) < kSingularityTolerance) {
+    return false;
+  }
+
+  const double base_joint_y_m = -0.5 * tan30 * ff * mmtm;
+  point_m.y -= 0.5 * tan30 * ee * mmtm;
+
+  const double upper_arm_m = rf * mmtm;
+  const double forearm_m = re * mmtm;
+  const double line_offset =
+      (point_m.x * point_m.x + point_m.y * point_m.y + point_m.z * point_m.z +
+       upper_arm_m * upper_arm_m - forearm_m * forearm_m -
+       base_joint_y_m * base_joint_y_m) /
+      (2.0 * point_m.z);
+  const double line_slope = (base_joint_y_m - point_m.y) / point_m.z;
+  double discriminant =
+      -(line_offset + line_slope * base_joint_y_m) *
+          (line_offset + line_slope * base_joint_y_m) +
+      upper_arm_m * upper_arm_m * (line_slope * line_slope + 1.0);
+
+  if (!std::isfinite(discriminant) || discriminant < -kDiscriminantTolerance) {
+    return false;
+  }
+  discriminant = std::max(0.0, discriminant);
+
+  const double elbow_y =
+      (base_joint_y_m - line_offset * line_slope - std::sqrt(discriminant)) /
+      (line_slope * line_slope + 1.0);
+  const double elbow_z = line_offset + line_slope * elbow_y;
+  theta_deg = std::atan2(-elbow_z, base_joint_y_m - elbow_y) * rtd;
+  return std::isfinite(theta_deg);
 }
 
-bool delta_robot::angle_yz(Point point, double& theta) {
-    theta = 0.0;
+bool DeltaRobot::createJointStatePositions(
+    const Point &point_m, const Theta &theta_deg,
+    JointPositions &positions_rad_m) const {
+  if (!isFinite(point_m) || !isFinite(theta_deg)) {
+    return false;
+  }
 
-    double y1 = -0.5 * tan30 * ff * mmtm;
-    point.y = point.y - 0.5 * tan30 * ee * mmtm;
-    if (std::abs(point.z) < 1e-9) {
-        return false;
-    }
-    // z = a + b * y
-    double a = (point.x * point.x + point.y * point.y + point.z * point.z + rf * mmtm * rf * mmtm - re * mmtm * re * mmtm - y1 * y1) / (2.0 * point.z);
-    double b = (y1 - point.y) / point.z;
+  // RViz uses the model's axis convention, which swaps and negates TCP X/Y/Z.
+  const Vector3 tcp_position{-point_m.y, -point_m.x, -point_m.z};
 
-    // discriminante
-    // d = -(a + b * y1) * (a + b * y1) + rf * (b * b * rf + rf)
-    double d = ((-1) * (a + b * y1) * (a + b * y1)) + (rf * mmtm * rf * mmtm * (b * b + 1.0));
+  const Vector3 elbow1 = rotate240(elbowPoint(theta_deg.angle1));
+  const Vector3 elbow2 = elbowPoint(theta_deg.angle2);
+  const Vector3 elbow3 = rotate120(elbowPoint(theta_deg.angle3));
+  const Vector3 end_effector1 = endEffectorPoint(Arm::One, tcp_position);
+  const Vector3 end_effector2 = endEffectorPoint(Arm::Two, tcp_position);
+  const Vector3 end_effector3 = endEffectorPoint(Arm::Three, tcp_position);
 
-    if (d < 0) {
-        return false;
-    }
+  double arm1_angle_a = 0.0;
+  double arm1_angle_b = 0.0;
+  double arm2_angle_a = 0.0;
+  double arm2_angle_b = 0.0;
+  double arm3_angle_a = 0.0;
+  double arm3_angle_b = 0.0;
+  if (!elbowAngles(Arm::One, elbow1, end_effector1, arm1_angle_a,
+                   arm1_angle_b) ||
+      !elbowAngles(Arm::Two, elbow2, end_effector2, arm2_angle_a,
+                   arm2_angle_b) ||
+      !elbowAngles(Arm::Three, elbow3, end_effector3, arm3_angle_a,
+                   arm3_angle_b)) {
+    return false;
+  }
 
-    double yj = ((y1 - a * b) - std::sqrt(d)) / (b * b + 1.0);
-    double zj = a + b * yj;
+  JointPositions positions{};
+  positions[0] = theta_deg.angle1 * dtr;
+  positions[1] = theta_deg.angle2 * dtr;
+  positions[2] = theta_deg.angle3 * dtr;
+  positions[3] = positions[0] + arm1_angle_a;
+  positions[4] = arm1_angle_b;
+  positions[5] = positions[1] + arm2_angle_a;
+  positions[6] = arm2_angle_b;
+  positions[7] = positions[2] + arm3_angle_a;
+  positions[8] = arm3_angle_b;
+  positions[9] = point_m.x;
+  positions[10] = point_m.y;
+  positions[11] = point_m.z;
 
-    if ((y1 - yj) != 0.0) {
-        theta = std::atan(((-1) * (zj)) / (std::abs(y1 - yj)));
-        if (yj < y1) {
-            theta = theta * (rtd);
-        }
-        else {
-            if (zj < 0) {
-                theta = theta * (180.0 / pi);
-                theta = 180.0 - theta;
-            }
-            else {
-                theta = theta * (180.0 / pi);
-                theta = (-1.0 * 180.0) + theta;
-            }
-        }
-    }
-    else {
-        if (zj < 0) {
-            theta = 90.0;
-        }
-        else {
-            theta = -90.0;
-        }
-    }
+  if (!std::all_of(positions.begin(), positions.end(),
+                   [](double value) { return std::isfinite(value); })) {
+    return false;
+  }
 
-    return std::isfinite(theta);
+  positions_rad_m = positions;
+  return true;
 }
 
-/// @brief 
-/// @param ti 
-/// @param pointi 
-/// @param theta 
-/// @param gripper 
-/// @param position 
-void delta_robot::create_joint_state_list(
-    Point pointi,
-    Theta theta,
-    std::array<double, 12>& position
-) {
-    // Rviz interior angles in Radians
-    double punto[3] = {-pointi.y, -pointi.x, -pointi.z};
-
-    double a1_a = 0;
-    double a2_a = 0;
-    double a3_a = 0;
-    double a1_b = 0;
-    double a2_b = 0;
-    double a3_b = 0;
-
-    double temp[3] = {0,0,0};
-    double c1[3] = {0,0,0};
-    double p1[3] = {0,0,0};
-    double c2[3] = {0,0,0};
-    double p2[3] = {0,0,0};
-    double c3[3] = {0,0,0};
-    double p3[3] = {0,0,0};
-
-    punto_codo(theta.angle1, temp);
-    rotation240(temp, c1);
-    punto_ee(1, punto, p1);
-    angulos_codo(1, c1, p1, a1_a, a1_b);
-
-    punto_codo(theta.angle2, c2);
-    punto_ee(2, punto, p2);
-    angulos_codo(2, c2, p2, a2_a, a2_b);
-
-    punto_codo(theta.angle3, temp);
-    rotation120(temp, c3);
-    punto_ee(3, punto, p3);
-    angulos_codo(3, c3, p3, a3_a, a3_b);
-
-    // Data to publish in Rviz
-    position[0]  = theta.angle1 * dtr;
-    position[1]  = theta.angle2 * dtr;
-    position[2]  = theta.angle3 * dtr;
-    position[3]  = theta.angle1 * dtr + a1_a;
-    position[4]  = a1_b;
-    position[5]  = theta.angle2 * dtr + a2_a;
-    position[6]  = a2_b;
-    position[7]  = theta.angle3 * dtr + a3_a;
-    position[8]  = a3_b;
-    delta_robot_config::mapTcpToActuatorJoints(
-        pointi.x, pointi.y, pointi.z,
-        position[9], position[10], position[11]);
-
-    // cout << "position[0]=" << position[0] << ", position[1]=" << position[1] << ", position[2]=" << position[2] << endl;
-    // cout << "position[3]=" << position[3] << ", position[4]=" << position[4] << ", position[5]=" << position[5] << endl;
-    // cout << "position[6]=" << position[6] << ", position[7]=" << position[7] << ", position[8]=" << position[8] << endl;
-    // cout << "position[9]=" << position[9] << ", position[10]=" << position[10] << ", position[11]=" << position[11] << endl << endl;
+DeltaRobot::Vector3 DeltaRobot::elbowPoint(double theta_deg) {
+  const double theta_rad = theta_deg * dtr;
+  return {(hf * mmtm) / 3.0 + rf * mmtm * std::cos(theta_rad), 0.0,
+          rf * mmtm * std::sin(theta_rad)};
 }
 
-//Plano XZ
-/// @brief punto_codo  (J 1,2,3)
-/// @param theta 
-/// @param b1 
-void delta_robot::punto_codo(double theta, double (&b1)[3]) {
-    theta *= dtr;
-    b1[0] = A1[0] + rf * mmtm * std::cos(theta);
-    b1[1] = 0.0;
-    b1[2] = rf * mmtm * std::sin(theta);
+DeltaRobot::Vector3 DeltaRobot::rotate120(const Vector3 &input) {
+  return {cos120 * input[0] + sin120 * input[1],
+          -sin120 * input[0] + cos120 * input[1], input[2]};
 }
 
-/// @brief rotation120
-/// @param ent 
-/// @param sal 
-void delta_robot::rotation120(double ent[3], double(&sal)[3]) {
-    sal[0] = cos120 * ent[0] + sin120 * ent[1];
-    sal[1] = -sin120 * ent[0] + cos120 * ent[1];
-    sal[2] = ent[2];
+DeltaRobot::Vector3 DeltaRobot::rotate240(const Vector3 &input) {
+  return {cos240 * input[0] + sin240 * input[1],
+          -sin240 * input[0] + cos240 * input[1], input[2]};
 }
 
-/// @brief rotation240
-/// @param ent 
-/// @param sal 
-void delta_robot::rotation240(double ent[3], double(&sal)[3]) {
-    sal[0] = cos240 * ent[0] + sin240 * ent[1];
-    sal[1] = -sin240 * ent[0] + cos240 * ent[1];
-    sal[2] = ent[2];
+DeltaRobot::Vector3 DeltaRobot::rotateY(const Vector3 &input,
+                                        double angle_rad) {
+  const double cosine = std::cos(angle_rad);
+  const double sine = std::sin(angle_rad);
+  return {input[0] * cosine - input[2] * sine, input[1],
+          -input[0] * sine + input[2] * cosine};
 }
 
-/// @brief punto_ee  EE1,2,3 ]
-/// @param eee 
-/// @param brazo 
-/// @param sal 
-void delta_robot::punto_ee(int brazo, double eee[3], double (&sal)[3]) {
-    double vhe1[3] = { 0, 0, 0 };
-    double vhe2[3] = { (he * mmtm) / 3, 0.0, 0.0 };
-    double vhe3[3] = { 0, 0, 0 };
+DeltaRobot::Vector3 DeltaRobot::endEffectorPoint(Arm arm,
+                                                 const Vector3 &tcp_position) {
+  const Vector3 arm2_offset{(he * mmtm) / 3.0, 0.0, 0.0};
+  const Vector3 arm3_offset = rotate120(arm2_offset);
+  const Vector3 arm1_offset = rotate120(arm3_offset);
 
-    rotation120(vhe2, vhe3);
-    rotation120(vhe3, vhe1);
+  Vector3 offset = arm2_offset;
+  if (arm == Arm::One) {
+    offset = arm1_offset;
+  } else if (arm == Arm::Three) {
+    offset = arm3_offset;
+  }
 
-    if (brazo == 2) {
-        sum_vector(eee, vhe2, sal);
-    }
-    else if (brazo == 3) {
-        sum_vector(eee, vhe3, sal);
-    }
-    else if (brazo == 1) {
-        sum_vector(eee, vhe1, sal);
-    }
+  return {tcp_position[0] + offset[0], tcp_position[1] + offset[1],
+          tcp_position[2] + offset[2]};
 }
 
-/// @brief 
-/// @param v1 
-/// @param v2 
-/// @param s 
-void delta_robot::sum_vector(double v1[3], double v2[3], double (&s)[3]) {
-    s[0] = v1[0] + v2[0];
-    s[1] = v1[1] + v2[1];
-    s[2] = v1[2] + v2[2];
-}
+bool DeltaRobot::elbowAngles(Arm arm, const Vector3 &elbow,
+                             const Vector3 &end_effector, double &angle_a_rad,
+                             double &angle_b_rad) {
+  Vector3 oriented_elbow = elbow;
+  Vector3 oriented_end_effector = end_effector;
+  if (arm == Arm::One) {
+    oriented_elbow = rotate120(elbow);
+    oriented_end_effector = rotate120(end_effector);
+  } else if (arm == Arm::Three) {
+    oriented_elbow = rotate240(elbow);
+    oriented_end_effector = rotate240(end_effector);
+  }
 
-/// @brief angulos_codo
-/// @param codo 
-/// @param eee 
-/// @param brazo 
-/// @param ang_a 
-/// @param ang_b 
-void delta_robot::angulos_codo(int brazo, double codo[3], double eee[3], double &ang_a, double &ang_b) {
-    double _codo[3] = {};
-    double _eee[3] = {};
-    if (brazo == 3) {
-        rotation240(codo, _codo);
-        rotation240(eee, _eee);
-    }
-    else if (brazo == 1) {        
-        rotation120(codo, _codo);
-        rotation120(eee, _eee);
-    }
-    else {
-        for (int i = 0; i < 3; i++) {
-            _codo[i] = codo[i];
-            _eee[i] = eee[i];
-        }
-    }
+  angle_a_rad = std::atan2(oriented_end_effector[2] - oriented_elbow[2],
+                           oriented_elbow[0] - oriented_end_effector[0]);
 
-    if ((_codo[0] - _eee[0]) != 0) {
-        ang_a = std::atan((_eee[2] - _codo[2]) / (_codo[0] - _eee[0]));
-        if ((_codo[0] - _eee[0]) < 0) ang_a = ang_a + (180 * dtr);
-    }
-    else {
-        std::cout << "entra" << std::endl;
-        ang_a = 1.570796326794897;
-    }
+  // Value-returning transforms preserve both source coordinates.
+  oriented_elbow = rotateY(oriented_elbow, angle_a_rad);
+  oriented_end_effector = rotateY(oriented_end_effector, angle_a_rad);
+  angle_b_rad = std::atan2(oriented_end_effector[1],
+                           oriented_elbow[0] - oriented_end_effector[0]);
 
-    //prep
-    rotation_y(_codo, ang_a, _codo);
-    rotation_y(_eee, ang_a, _eee);
-
-    //calc
-    if ((_codo[0] - _eee[0]) != 0) {
-        ang_b = std::atan((_eee[1] - 0) / (_codo[0] - _eee[0]));
-        if ((_codo[0] - _eee[0]) < 0) {
-            ang_a = ang_a + (180 * dtr);
-        }
-    }
-    else { 
-        ang_b = 1.570796326794897;
-    }
-}
-
-/// @brief rotation_y
-/// @param ent 
-/// @param ang 
-/// @param sal 
-void delta_robot::rotation_y(double ent[3], double ang, double(&sal)[3]) {
-    sal[0] = ent[0] * std::cos(ang) - ent[2] * std::sin(ang);
-    sal[1] = ent[1];
-    sal[2] = -ent[0] * std::sin(ang) + ent[2] * std::cos(ang);
+  return std::isfinite(angle_a_rad) && std::isfinite(angle_b_rad);
 }

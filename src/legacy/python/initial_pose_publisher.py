@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Optional standalone node to publish initial joint_states once.
+"""Archived standalone node to publish initial joint_states once.
 
-When using display.launch.py, main_node publishes the initial pose on /joint_states.
+The active main_node already publishes the initial pose on /joint_states.
 """
 import rclpy
 from rclpy.node import Node

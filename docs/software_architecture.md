@@ -1,291 +1,212 @@
 # Software Architecture
 
-This document illustrates the ROS 2 software architecture for `my_delta_robot`.
-The full operator runtime is launched by `control.launch.py`, which includes
-`display.launch.py` and starts the Tkinter panel. Older camera and image-processing
-files are documented separately as optional or legacy flows.
+## Runtime topology
 
-## Active Runtime Architecture
+`bringup.launch.py` is the canonical launcher. It always starts the motion
+runtime and robot model; `gui` and `rviz` launch arguments control optional
+operator processes.
 
 ```mermaid
 flowchart LR
-    subgraph UserLayer["User command layer"]
-        GUI["gui_user_interface_node.py<br/>Tkinter ROS 2 UI"]
-        TUI["user_interface_node.py<br/>terminal ROS 2 UI"]
-        CLI["ros2 topic pub<br/>manual commands"]
+    subgraph Inputs
+        GUI["Tkinter control panel"]
+        TUI["Terminal UI"]
+        CLI["ROS 2 CLI / custom node"]
     end
 
-    subgraph CommandTopics["Command topics"]
-        LimitsTopic["/set_vmax_amax<br/>VmaxAmax"]
-        ShapeTopic["/set_current_point<br/>Posicionxyz"]
-        DirectSegmentTopic["/input_ls_final<br/>LinearSpeedXYZ"]
-        CircleTopic["/input_circle<br/>CircleXYZ"]
-        ResolutionTopic["/set_num_point<br/>NumPoint"]
+    subgraph Commands
+        LIMITS["/set_vmax_amax"]
+        SHAPE["/set_current_point"]
+        LINE["/input_ls_final"]
+        CIRCLE["/input_circle"]
     end
 
-    subgraph MotionLayer["Motion orchestration layer"]
-        DrawNode["draw_node<br/>shape waypoint queue"]
-        MainNode["main_node<br/>trajectory executor"]
+    subgraph Runtime
+        DRAW["draw_node<br/>drawing state machine"]
+        MAIN["main_node<br/>authoritative TCP + executor"]
     end
 
-    subgraph CoreLibrary["Delta robot C++ library"]
-        Validation["command_validation.hpp<br/>finite and positive input guards"]
-        ShapePath["shape_path.hpp<br/>closed waypoint generation"]
-        Planner["CartesianTrajectoryGenerator<br/>trapezoid or triangular profile"]
-        IK["delta_robot<br/>inverse_checked + joint mapping"]
-        Config["joint_state_config.hpp<br/>joint names + home pose"]
+    subgraph Core
+        PATHS["shape_path"]
+        PLANNER["Cartesian planner"]
+        IK["Delta kinematics"]
+        MAPPING["12-joint RViz mapping"]
     end
 
-    subgraph Visualization["Visualization layer"]
-        JointStates["/joint_states<br/>sensor_msgs/JointState"]
-        VelocityOut["/v_a_out<br/>VmaxAmax runtime profile sample"]
-        Status["/status_delta<br/>std_msgs/String"]
-        DrawingStatus["/drawing_status<br/>std_msgs/String"]
-        RSP["robot_state_publisher<br/>URDF to TF"]
-        StaticTF["static_transform_publisher<br/>world to base_link"]
-        TF["/tf tree"]
-        RViz["rviz2<br/>my_config.rviz"]
+    subgraph Output
+        JOINTS["/joint_states"]
+        MOTION_STATUS["/status_delta"]
+        DRAW_STATUS["/drawing_status"]
+        RSP["robot_state_publisher"]
+        RVIZ["RViz"]
     end
 
-    GUI --> LimitsTopic
-    GUI --> ShapeTopic
-    GUI --> DirectSegmentTopic
-    TUI --> LimitsTopic
-    TUI --> ShapeTopic
-    CLI --> LimitsTopic
-    CLI --> ShapeTopic
-    CLI --> DirectSegmentTopic
-    CLI --> ResolutionTopic
+    GUI --> LIMITS
+    GUI --> SHAPE
+    GUI --> LINE
+    TUI --> LIMITS
+    TUI --> SHAPE
+    CLI --> LIMITS
+    CLI --> SHAPE
+    CLI --> LINE
+    CLI --> CIRCLE
 
-    LimitsTopic --> MainNode
-    ResolutionTopic --> MainNode
-    ShapeTopic --> DrawNode
-    DrawNode --> ShapePath
-    DrawNode --> DirectSegmentTopic
-    DrawNode --> CircleTopic
-    DirectSegmentTopic --> MainNode
-    CircleTopic --> MainNode
-
-    MainNode --> Validation
-    MainNode --> Planner
-    MainNode --> IK
-    IK --> Config
-    MainNode --> JointStates
-    MainNode --> VelocityOut
-    MainNode --> Status
-    Status --> DrawNode
-    Status --> GUI
-    DrawNode --> DrawingStatus
-    DrawingStatus --> GUI
-    JointStates --> GUI
-
-    JointStates --> RSP
-    StaticTF --> TF
-    RSP --> TF
-    TF --> RViz
+    SHAPE --> DRAW
+    DRAW --> PATHS
+    DRAW --> LINE
+    DRAW --> CIRCLE
+    LIMITS --> MAIN
+    LINE --> MAIN
+    CIRCLE --> MAIN
+    MAIN --> PLANNER
+    MAIN --> IK
+    IK --> MAPPING
+    MAIN --> JOINTS
+    MAIN --> MOTION_STATUS
+    MOTION_STATUS --> DRAW
+    MOTION_STATUS --> GUI
+    DRAW --> DRAW_STATUS
+    DRAW_STATUS --> GUI
+    DRAW_STATUS --> TUI
+    JOINTS --> GUI
+    JOINTS --> RSP
+    RSP --> RVIZ
 ```
 
-## Runtime Responsibilities
+## Responsibilities
 
-| Component | Source | Responsibility |
-|-----------|--------|----------------|
-| `control.launch.py` | `src/launch/control.launch.py` | Includes the display runtime and starts the Tkinter operator panel for a one-command demo. |
-| `display.launch.py` | `src/launch/display.launch.py` | Starts `world_to_base_link`, `robot_state_publisher`, `main_node`, `draw_node`, then RViz after a short delay. |
-| `gui_user_interface_node.py` | `src/python_scripts/gui_user_interface_node.py` | Publishes motion limits, shape requests, direct targets, and jog moves; consumes TCP, segment, and drawing status for operator feedback and command locking. |
-| `user_interface_node.py` | `src/python_scripts/user_interface_node.py` | Legacy terminal UI that publishes the same active command topics. |
-| `draw_node` | `src/src/draw_node.cpp` | Guards one active drawing sequence and coordinates approach line, continuous circle, and return line states. |
-| `main_node` | `src/src/main_node.cpp` | Validates line/circle motion and limits, preflights IK, executes against steady-clock elapsed time, and publishes joint states plus `DONE`/`FAILED` status. |
-| `command_validation.hpp` | `src/delta_robot/command_validation.hpp` | Provides shared finite-coordinate and positive motion-limit validation. |
-| `shape_path.hpp` | `src/delta_robot/shape_path.hpp` | Generates deterministic closed rectangle, triangle, and circle waypoint lists. |
-| `delta_robot` library | `src/delta_robot/` | Provides inverse kinematics, motion limits, trapezoidal trajectory utilities, and RViz joint mapping. |
-| `robot_state_publisher` | ROS 2 runtime | Converts `/joint_states` plus `delta_robot.urdf` into TF transforms for RViz. |
+| Component | Responsibility |
+|---|---|
+| `bringup.launch.py` | Start the model, motion nodes, and optional UI/RViz processes |
+| `main_node` | Own current TCP state, validate commands, plan and preflight trajectories, publish samples and motion status |
+| `draw_node` | Convert shape requests into a guarded sequence of line/circle commands |
+| trajectory planner | Generate bounded, time-stamped line and circle samples |
+| kinematics model | Compute checked inverse kinematics and mapped joint positions |
+| GUI | Validate operator input, publish commands, and display live state/status |
+| terminal UI | Publish one drawing command at a time and wait for truthful completion feedback |
+| `robot_state_publisher` | Convert `/joint_states` and the URDF into TF |
 
-## Shape Command Sequence
+## Units and ownership
+
+- ROS Cartesian commands use millimetres.
+- Motion-limit commands use millimetres per second and millimetres per second
+  squared.
+- The planner and inverse-kinematics core use metres and SI-derived units.
+- `main_node` is the authority for the current TCP. The start fields in
+  `LinearSpeedXYZ` remain for compatibility and diagnostics, but do not control
+  the actual start of a new trajectory.
+- The home TCP is `(0, 0, -375 mm)` in `base_link`.
+
+Keeping state ownership in `main_node` prevents a delayed UI sample or arbitrary
+caller start from teleporting `/joint_states`.
+
+## Direct-line execution
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant UI as Operator GUI or terminal UI
-    participant Limits as /set_vmax_amax
-    participant Shape as /set_current_point
-    participant Draw as draw_node
-    participant Segment as /input_ls_final
+    participant Client
     participant Main as main_node
-    participant Planner as CartesianTrajectoryGenerator
-    participant Robot as delta_robot IK
-    participant JS as /joint_states
-    participant VOut as /v_a_out
-    participant Status as /status_delta
-    participant RSP as robot_state_publisher
-    participant RViz as RViz
-
-    UI->>Limits: Publish VmaxAmax(vmax, amax)
-    Limits->>Main: Update motion_limits()
-    UI->>Shape: Publish Posicionxyz(type 6, 7, or 8)
-    Shape->>Draw: Receive drawing action
-    Draw->>Draw: Reject if busy; otherwise generate and enqueue shape waypoints
-    Draw->>Segment: Publish first LinearSpeedXYZ(start, target)
-    Segment->>Main: Receive segment command
-    Main->>Planner: planLine(start_m, target_m, limits, 0.001 s)
-    Planner-->>Main: Return sampled trajectory
-    loop Preflight for every sample
-        Main->>Robot: inverse_checked(sample.position_m)
-        Robot-->>Main: IK ok or rejection reason
-    end
-    loop 1 ms timer using steady-clock elapsed time
-        Main->>Main: Select latest due sample
-        Main->>Robot: inverse_checked(selected sample)
-        Main->>Robot: create_joint_state_list(position, theta)
-        Main->>JS: Publish JointState
-        Main->>VOut: Publish profile velocity and acceleration
-        JS->>RSP: Consume joint positions
-        RSP->>RViz: Publish TF transforms
-    end
-    alt Segment completes
-        Main->>Status: Publish DONE message
-        Status->>Draw: Mark waypoint complete
-    else Runtime failure
-        Main->>Status: Publish FAILED message
-        Status->>Draw: Clear queue without advancing current point
-    end
-    alt More queued waypoints
-        Draw->>Segment: Publish next LinearSpeedXYZ
-    else Queue empty
-        Draw->>UI: Publish DONE on /drawing_status
-        Draw->>Draw: Wait for next command
-    end
-```
-
-## Direct Segment Sequence
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant CLI as GUI, ros2 topic pub, or custom node
-    participant Segment as /input_ls_final
-    participant Main as main_node
-    participant Planner as CartesianTrajectoryGenerator
-    participant Robot as delta_robot
-    participant JS as /joint_states
+    participant Planner
+    participant IK as Kinematics
+    participant State as /joint_states
     participant Status as /status_delta
 
-    CLI->>Segment: Publish LinearSpeedXYZ(xo, yo, zo, xf, yf, zf)
-    Segment->>Main: Segment callback
-    alt Motion already active
-        Main-->>CLI: Reject through ROS warning log
-    else Invalid or identical coordinates
-        Main->>Status: Publish FAILED with reason
-    else Segment accepted
-        Main->>Planner: Generate sampled line profile
-        Main->>Robot: Validate IK for every planned sample
-        alt Planning or IK fails
-            Main->>Status: Publish FAILED with reason
-        else Plan valid
-            loop 1 kHz timer paced by steady-clock elapsed time
-                Main->>Main: Select latest due trajectory sample
-                Main->>Robot: Compute IK and 12-joint RViz state
-                Main->>JS: Publish JointState
+    Client->>Main: LinearSpeedXYZ target (mm)
+    Main->>Main: Read authoritative current TCP
+    Main->>Planner: Plan current TCP to target (m)
+    alt Invalid request or plan
+        Main->>Status: FAILED with reason
+    else Plan created
+        loop Preflight every sample
+            Main->>IK: Checked inverse kinematics
+        end
+        alt Any sample is unreachable
+            Main->>Status: FAILED with sample/reason
+        else Complete path is valid
+            loop Steady-clock execution
+                Main->>IK: Map due sample to modeled joints
+                Main->>State: Publish latest due sample
             end
-            Main->>Status: Publish DONE message
+            Main->>Status: DONE
         end
     end
 ```
 
-## Continuous Circle Sequence
+Trajectory samples are planned at 1 ms intervals. The timer selects samples
+from steady-clock elapsed time, so callback jitter does not stretch a motion by
+advancing exactly one sample per callback.
+
+## Shape execution
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant UI as GUI or terminal UI
+    participant UI
     participant Draw as draw_node
-    participant Line as /input_ls_final
-    participant Circle as /input_circle
     participant Main as main_node
-    participant Planner as CartesianTrajectoryGenerator
-    participant Status as /status_delta
+    participant DrawStatus as /drawing_status
+    participant MotionStatus as /status_delta
 
-    UI->>Draw: Posicionxyz(type 8)
-    Draw->>Line: Move from current point to circle start
-    Main->>Status: DONE approach line
-    Status->>Draw: Circle start reached
-    Draw->>Circle: CircleXYZ(center, Z, radius, direction)
-    Main->>Planner: planCircle(..., 0.001 s)
-    Planner-->>Main: One continuous sampled revolution
-    loop Steady-clock execution
-        Main->>Main: Publish latest due tangent-motion sample
+    UI->>Draw: Posicionxyz shape constant
+    alt Drawing already active
+        Draw-->>UI: Reject in logs/status
+    else Command accepted
+        Draw->>DrawStatus: STARTED
+        Draw->>Main: First line target
+        loop Each line waypoint
+            Main->>MotionStatus: DONE or FAILED
+            alt Failed
+                Draw->>Draw: Clear remaining sequence
+                Draw->>DrawStatus: FAILED
+            else More waypoints
+                Draw->>Main: Next line target
+            end
+        end
+        opt Continuous circle
+            Draw->>Main: Approach circle start
+            Main->>MotionStatus: DONE
+            Draw->>Main: One full circle
+            Main->>MotionStatus: DONE
+            Draw->>Main: Return target
+        end
+        Draw->>DrawStatus: DONE
     end
-    Main->>Status: DONE circle
-    Status->>Draw: Revolution completed
-    Draw->>Line: Return from circle start to home
 ```
 
-## Launch And Visualization Startup
+Rectangle and triangle paths close exactly before returning to the prior point.
+A circle is one parametric revolution rather than a polygon, so the robot does
+not stop at intermediate vertices.
+
+## Startup
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    participant Launch as display.launch.py
-    participant StaticTF as static_transform_publisher
+    participant Launch as bringup.launch.py
+    participant StaticTF as world_to_base_link
     participant RSP as robot_state_publisher
     participant Main as main_node
     participant Draw as draw_node
-    participant RViz as rviz2
+    participant Optional as GUI / RViz
 
-    Launch->>StaticTF: Start world to base_link transform
-    Launch->>RSP: Start with delta_robot.urdf as robot_description
-    Launch->>Main: Start trajectory executor
-    Launch->>Draw: Start shape waypoint queue
-    Main->>RSP: Publish initial /joint_states immediately
-    loop Startup and idle heartbeat every 200 ms
-        Main->>RSP: Republish current state to avoid startup races
-    end
-    Launch->>RViz: Start after 2 second TimerAction
-    RSP->>RViz: TF tree and robot model become visible
+    Launch->>StaticTF: Start static transform
+    Launch->>RSP: Load robot_description
+    Launch->>Main: Start executor and publish initial state
+    Launch->>Draw: Start drawing sequencer
+    Launch->>Optional: Start when enabled by launch arguments
+    Main->>RSP: Initial and idle joint-state heartbeat
 ```
 
-## Optional Legacy Camera And Hardware Flow
+RViz may start immediately; the idle joint-state heartbeat and normal TF
+discovery handle startup ordering without a hard-coded delay.
 
-These files are present in the repository but are not part of the active
-`display.launch.py` build/run path.
+## Current protocol limitation
 
-```mermaid
-flowchart LR
-    Camera["camera_node.py / test_camera_node.py<br/>ROS 1 style rospy + OpenCV"]
-    ImageTopic["/data_image<br/>ImagePos"]
-    NodeA["node_a.cpp<br/>image point dispatcher<br/>not built by CMake"]
-    SendToB["/send_to_node_b<br/>Posicionxyz"]
-    DrawNode["draw_node<br/>still subscribes to send_to_node_b"]
-    StatusToA["/status_to_node_a<br/>std_msgs/String"]
-    StatusToImage["/status_to_image_node<br/>std_msgs/String"]
-    Serial["serial_module.cpp<br/>serial hardware bridge<br/>not built by CMake"]
-    JointStates["/joint_states"]
-    Hardware["External controller<br/>/dev/ttyTHS1 JSON"]
+`/status_delta` and `/drawing_status` are human-readable strings. They are
+adequate for the current single-command simulation UI, but they have no goal
+identifier, typed result, cancellation, or robust multi-client arbitration.
+The preferred next architecture is a ROS 2 action owned by `main_node`, with
+`draw_node` acting as an action client for multi-stage shapes.
 
-    Camera --> ImageTopic
-    ImageTopic --> NodeA
-    NodeA --> SendToB
-    SendToB --> DrawNode
-    DrawNode --> StatusToA
-    StatusToA --> NodeA
-    NodeA --> StatusToImage
-    StatusToImage --> Camera
-
-    JointStates -. optional .-> Serial
-    Serial -. optional .-> Hardware
-```
-
-## Topic Map
-
-| Topic | Message | Publisher | Subscriber | Notes |
-|-------|---------|-----------|------------|-------|
-| `/set_vmax_amax` | `VmaxAmax` | GUI, terminal UI, CLI | `main_node` | Sets max velocity and acceleration in mm units at the command interface. |
-| `/set_current_point` | `Posicionxyz` | GUI, terminal UI, CLI | `draw_node` | Type `6`, `7`, `8` request rectangle, triangle, circle. Types `-1` through `5` update draw-node reference state. |
-| `/input_ls_final` | `LinearSpeedXYZ` | GUI, `draw_node`, CLI/custom nodes | `main_node` | One Cartesian line segment from start to target. The GUI synchronizes `draw_node`'s current point after completion. |
-| `/input_circle` | `CircleXYZ` | `draw_node`, custom nodes | `main_node` | One full parametric circle with continuous tangential motion. |
-| `/set_num_point` | `NumPoint` | CLI/custom nodes | `main_node` | Updates the legacy offline resolution value; runtime planner samples at 1 kHz. |
-| `/joint_states` | `sensor_msgs/JointState` | `main_node` | GUI, `robot_state_publisher`, RViz, optional serial bridge | Contains 12 published joints matching `joint_state_config.hpp` and the URDF; idle heartbeat is 5 Hz. |
-| `/status_delta` | `std_msgs/String` | `main_node` | GUI, `draw_node` | `DONE ...` advances the queue; `FAILED: ...` clears it without updating the assumed current point. |
-| `/drawing_status` | `std_msgs/String` | `draw_node` | GUI | Complete drawing lifecycle: `STARTED:`, `DONE:`, or `FAILED:`. |
-| `/v_a_out` | `VmaxAmax` | `main_node` | optional observers | Publishes current path velocity and acceleration sample values. |
-| `/send_to_node_b` | `Posicionxyz` | legacy `node_a` or custom nodes | `draw_node` | Supported by `draw_node`, but active CMake does not build `node_a`. |
-| `/status_to_node_a` | `std_msgs/String` | `draw_node` | legacy `node_a` | Used only by the legacy image-pipeline handshake. |
+Unsupported ROS 1 camera and hardware experiments are isolated under
+[`src/legacy/`](../src/legacy/README.md) and are not part of this architecture.

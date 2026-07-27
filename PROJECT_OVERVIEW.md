@@ -1,189 +1,88 @@
-# Project Overview: ROS 2 Delta Robot
+# Project Overview
 
-_Last reviewed and verified: 2026-07-18_
+## Purpose
 
-## Executive Summary
+`my_delta_robot` is a ROS 2 motion-planning and visualization prototype for a
+three-arm delta robot. The supported workflow accepts shape or Cartesian
+commands, plans time-parameterized motion, validates every sample with inverse
+kinematics, and publishes a 12-joint model for RViz and operator feedback.
 
-`my_delta_robot` is a ROS 2 package for simulating and visualizing a three-arm delta parallel robot. Its current active workflow accepts rectangle, triangle, smooth-circle, direct Cartesian, and incremental jog commands; generates time-sampled trajectories; validates inverse kinematics (IK) for the entire path; and publishes a 12-joint state for the operator panel, `robot_state_publisher`, and RViz.
+It is intentionally a simulation package today. Hardware timing, homing,
+feedback, safety interlocks, and emergency-stop behavior are outside the active
+runtime.
 
-The project is currently strongest as a motion-planning and visualization prototype. It has a working ROS 2 command path, a reusable C++ kinematics/trajectory library, a Tkinter GUI, a terminal UI, a URDF/RViz setup, custom messages, and unit tests. Camera processing and physical motor communication exist only as legacy or experimental source files and are not part of the active build or launch path.
+## Current capabilities
 
-## Current Project Status
+| Area | State |
+|---|---|
+| Cartesian line planning | Active; triangular or trapezoidal profiles |
+| Continuous circle planning | Active; tangent motion with curvature-aware acceleration |
+| Inverse kinematics | Active; complete trajectories are preflighted |
+| Shape sequencing | Active; rectangle, triangle, and circle |
+| Visualization | Active; URDF, TF, joint states, and RViz |
+| Operator interfaces | Active; Tkinter panel and terminal menu |
+| Core automated tests | Active; kinematics, mapping, planners, guards, and paths |
+| Camera/image processing | Archived ROS 1 experiments |
+| Serial/motor output | Archived experiment; no supported hardware control |
 
-| Area | Status | Notes |
-|---|---|---|
-| ROS 2 package | Active | Package name: `my_delta_robot`; package version is still `0.0.0`. |
-| Motion planning | Active | Straight Cartesian segments use triangular or trapezoidal profiles sampled at 1 kHz and executed against steady-clock elapsed time. |
-| Inverse kinematics | Active | Every planned sample is checked before motion begins and checked again during execution. |
-| Shape drawing | Active | Rectangle and triangle use sequential lines; circles use one continuous 1 kHz parametric trajectory. |
-| Visualization | Active | URDF, TF, `/joint_states`, and RViz are started by `display.launch.py`. |
-| User interfaces | Active | The Tkinter operator panel provides connection/busy state, live TCP coordinates, limit presets, one-click shapes, direct moves, jog controls, and an activity log. A legacy terminal UI remains available. |
-| Automated tests | Passing | One GoogleTest target covers IK, joint mapping, planner profiles and guards, command validation, and shape closure. |
-| Latest verification | Passing | On 2026-07-18 the package built successfully and `colcon test-result --verbose` reported 13 tests with 0 errors, failures, or skips. |
-| Camera/image flow | Legacy | Several scripts use ROS 1 `rospy`; they are not installed or launched by the ROS 2 package. |
-| Serial/hardware control | Experimental | `serial_module.cpp` is present but is not compiled or launched. |
-
-Repository snapshot at review time:
-
-- Git branch: `branch_ros2`
-- Latest committed baseline: `9363ebe` (`2026-07-18`, “Refactor motion flow and add smooth circle trajectories”)
-- Active build products: `main_node`, `draw_node`, and three installed Python scripts
-- Main documentation: `README.md` and `docs/software_architecture.md`
-
-## System Architecture
+## Component boundaries
 
 ```mermaid
 flowchart LR
-    UI["Tkinter operator panel / terminal UI / ROS 2 CLI"]
-    LIMITS["/set_vmax_amax"]
-    SHAPE["/set_current_point"]
-    DRAW["draw_node<br/>shape waypoint queue"]
-    SEGMENT["/input_ls_final"]
-    CIRCLE["/input_circle"]
-    MAIN["main_node<br/>trajectory execution"]
-    CORE["delta_robot library<br/>planner + IK + joint mapping"]
-    JS["/joint_states"]
-    RSP["robot_state_publisher"]
-    RVIZ["RViz"]
-    STATUS["/status_delta"]
-    DRAW_STATUS["/drawing_status"]
+    UI["GUI / terminal / ROS CLI"]
+    DRAW["draw_node<br/>shape sequencing"]
+    MAIN["main_node<br/>motion ownership and execution"]
+    CORE["C++ core<br/>planner + IK + joint mapping"]
+    MODEL["robot_state_publisher + RViz"]
 
-    UI --> LIMITS --> MAIN
-    UI --> SHAPE --> DRAW
-    UI --> SEGMENT
-    DRAW --> SEGMENT --> MAIN
-    DRAW --> CIRCLE --> MAIN
+    UI -->|limits and direct targets| MAIN
+    UI -->|shape requests| DRAW
+    DRAW -->|line or circle target| MAIN
     MAIN --> CORE
     CORE --> MAIN
-    MAIN --> JS --> RSP --> RVIZ
-    MAIN --> STATUS --> DRAW
-    JS --> UI
-    DRAW --> DRAW_STATUS --> UI
+    MAIN -->|joint_states| MODEL
+    MAIN -->|motion status| UI
+    MAIN -->|motion status| DRAW
+    DRAW -->|drawing status| UI
 ```
 
-The shape flow is sequential. `draw_node` sends one line segment, waits for `main_node` to publish `DONE`, updates its current point, and then sends the next queued segment. A `FAILED:` status clears the queue without advancing the assumed current point. New drawing commands are rejected while a sequence is active.
+The core uses metres and seconds. ROS-facing Cartesian command messages use
+millimetres. `main_node` owns the authoritative current TCP, so a stale
+caller-provided start cannot create a discontinuity in the published model.
 
-## Main Components
+## Repository policy
 
-| Component | Location | Responsibility |
-|---|---|---|
-| `main_node` | `src/src/main_node.cpp` | Validates line/circle commands, plans and pre-validates trajectories, selects samples from steady-clock elapsed time, and publishes joint states, profile values, and success/failure status. |
-| `draw_node` | `src/src/draw_node.cpp` | Runs a guarded drawing state machine backed by `std::deque`; circle execution is a distinct continuous-motion state between approach and return lines. |
-| Delta robot library | `src/delta_robot/` | Implements inverse kinematics, Cartesian line profiles, motion-limit conversion, and the 12-joint RViz mapping. |
-| Command validation | `src/delta_robot/command_validation.hpp` | Rejects non-finite coordinates and non-positive/non-finite motion limits for every command source. |
-| Shape path generation | `src/delta_robot/shape_path.hpp` | Pure helpers generate closed rectangle, triangle, and circle paths for reuse and unit testing. |
-| GUI | `src/python_scripts/gui_user_interface_node.py` | Operator panel for motion limits, shape drawing, direct targets, jogging, live TCP feedback, connection state, busy state, and activity history. |
-| Terminal UI | `src/python_scripts/user_interface_node.py` | Provides the same command workflow in a terminal. |
-| Launch and visualization | `src/launch/`, `src/urdf/`, `src/rviz/` | `control.launch.py` starts the full operator environment; `display.launch.py` starts the runtime and RViz without the GUI. |
-| Custom interfaces | `src/msg/` | Defines seven project-specific message types. |
-| Tests | `src/test/test_delta_robot.cpp` | Exercises core kinematics, joint mapping, and trajectory behavior. |
+Only code wired into CMake, installed, launched, and tested belongs in the
+active package directories. Historical ROS 1 camera, tutorial, old drawing,
+serial, and redundant initial-pose files live under `src/legacy/` with their
+legacy-only interfaces.
 
-## Runtime Nodes and Topics
+The canonical entry point is `bringup.launch.py`. `control.launch.py` and
+`display.launch.py` remain thin compatibility launchers.
 
-| Topic | Message type | Publisher | Subscriber | Purpose |
-|---|---|---|---|---|
-| `/set_vmax_amax` | `VmaxAmax` | GUI, terminal UI, or CLI | `main_node` | Sets maximum Cartesian velocity and acceleration. |
-| `/set_current_point` | `Posicionxyz` | GUI, terminal UI, or CLI | `draw_node` | Updates draw configuration or requests a shape. |
-| `/input_ls_final` | `LinearSpeedXYZ` | GUI, `draw_node`, or CLI | `main_node` | Commands one Cartesian line segment in millimetres. |
-| `/input_circle` | `CircleXYZ` | `draw_node` or custom node | `main_node` | Commands one full continuous circle using center, Z plane, radius, and direction. |
-| `/set_num_point` | `NumPoint` | CLI/custom node | `main_node` | Sets the legacy offline resolution; it does not change the active 1 kHz runtime sampling. |
-| `/joint_states` | `sensor_msgs/JointState` | `main_node` | GUI, `robot_state_publisher`/RViz | Publishes 12 modeled joints at 5 Hz while idle and at trajectory rate while moving; the GUI reads `act_x/y/z` as live TCP coordinates. |
-| `/v_a_out` | `VmaxAmax` | `main_node` | Optional observers | Reports each sample's path velocity and acceleration. |
-| `/status_delta` | `std_msgs/String` | `main_node` | GUI, `draw_node` | Reports `DONE ...` on completion or `FAILED: ...` on a rejected/aborted segment. |
-| `/drawing_status` | `std_msgs/String` | `draw_node` | GUI | Reports complete-shape `STARTED:`, `DONE:`, and `FAILED:` states. |
-| `/send_to_node_b` | `Posicionxyz` | Legacy/custom source | `draw_node` | Retained compatibility input for the older image pipeline. |
-| `/status_to_node_a` | `std_msgs/String` | `draw_node` | Legacy `node_a` | Retained completion signal for the older image pipeline. |
+## Main risks
 
-Shape request codes on `/set_current_point` are `6` for rectangle, `7` for triangle, and `8` for circle. Codes `-1` through `5` alter the current point, three stored path points, or Z offsets; see `README.md` and `draw_node.cpp` before using these lower-level configuration commands.
+1. Motion completion uses uncorrelated string topics. A ROS 2 action would add
+   typed acceptance, feedback, goal IDs, cancellation, and multi-client safety.
+2. There is no supported physical-controller boundary or safety architecture.
+3. Runtime integration, launch, GUI, and URDF/TF behavior need broader
+   automated coverage.
+4. Shape dimensions and locations are mostly source-configured rather than ROS
+   parameters or typed command fields.
 
-## Motion and Coordinate Conventions
+## Recommended roadmap
 
-- Public Cartesian commands use millimetres; the planner and IK core use metres.
-- The TCP home pose is `(0, 0, -375 mm)` in `base_link`.
-- Negative Z points downward into the robot workspace.
-- Runtime defaults are `5000 mm/s` maximum velocity and `100 mm/s²` maximum acceleration.
-- The planner automatically uses a triangular profile for short moves and a trapezoidal profile when the path is long enough to reach the requested maximum velocity.
-- Each planned point must pass IK validation before the segment starts, preventing partial execution of a known-invalid path.
-- The 1 ms timer uses steady-clock elapsed time to select the correct planned sample, so callback jitter no longer stretches motion by blindly advancing one sample per callback.
-- The planner rejects non-finite input and trajectories requiring more than 1,000,000 samples.
-- Circle closure reuses the exact first waypoint, avoiding a near-zero floating-point closing segment.
-- Active circle drawing is parametric rather than a polygon: path velocity stays tangential, acceleration includes the radial centripetal term, curvature limits circle speed to the configured acceleration envelope, and the robot only stops at the beginning/end of the revolution.
+1. Replace line/circle status strings with a ROS 2 action and migrate drawing
+   sequencing to action goals.
+2. Add node-level and launch tests for acceptance, busy rejection, unreachable
+   targets, failure cleanup, and complete multi-segment drawings.
+3. Define hardware responsibilities: homing, joint limits, feedback, step
+   scheduling, watchdogs, and emergency stop.
+4. Expose validated shape geometry and workspace limits as ROS parameters or
+   typed goals.
+5. Add continuous integration for a clean build/install, tests, manifest
+   validation, formatting, and URDF checks.
 
-## Build, Run, and Test
-
-From the repository root:
-
-```bash
-./build.zsh
-source install/setup.zsh
-ros2 launch my_delta_robot display.launch.py
-```
-
-For the full operator environment, launch the runtime, RViz, and GUI together:
-
-```bash
-ros2 launch my_delta_robot control.launch.py
-```
-
-Alternatively, run the GUI in another sourced terminal:
-
-```bash
-ros2 run my_delta_robot gui_user_interface_node.py
-```
-
-Run the automated tests:
-
-```bash
-colcon test --packages-select my_delta_robot
-colcon test-result --verbose
-```
-
-The documented target environment is ROS 2 Humble or a compatible ROS 2 distribution. The package uses `ament_cmake`, C++ ROS nodes, Python ROS nodes, custom ROSIDL interfaces, `robot_state_publisher`, TF, and RViz.
-
-## Repository Layout
-
-```text
-ROS2/
-├── README.md                         # Setup, usage, and topic commands
-├── PROJECT_OVERVIEW.md               # This project-level summary
-├── docs/software_architecture.md     # Detailed Mermaid architecture and sequences
-├── build.zsh                         # Convenience colcon build script
-└── src/                              # ROS 2 package: my_delta_robot
-    ├── CMakeLists.txt
-    ├── package.xml
-    ├── delta_robot/                  # C++ kinematics and trajectory library
-    │   ├── command_validation.hpp    # Shared command guards
-    │   └── shape_path.hpp            # Pure drawing path generators
-    ├── src/                          # C++ ROS nodes plus inactive legacy sources
-    ├── python_scripts/               # Active UIs plus inactive camera experiments
-    ├── msg/                          # Seven custom messages
-    ├── launch/                       # Display and initial-pose launch files
-    ├── urdf/                         # Robot model
-    ├── rviz/                         # RViz configuration
-    ├── test/                         # GoogleTest suite
-    └── images/                       # Camera/image-processing sample assets
-```
-
-## Known Gaps and Risks
-
-1. **No active hardware output:** the main runtime stops at `/joint_states`; it does not generate step pulses or send commands to a motor controller.
-2. **Legacy code is mixed into the package tree:** camera scripts use ROS 1 APIs, and `node_a.cpp`, `node_b.cpp`, `serial_module.cpp`, and other experimental C++ files are not built by the current CMake configuration. This can make active versus historical functionality unclear.
-3. **Limited integration coverage:** core math, guards, and shape generation have tests, but live node topic behavior, launch startup, GUI behavior, and URDF/TF consistency are not tested automatically.
-4. **Status remains string-based:** success/failure handling is now explicit, but `/status_delta` still uses human-readable strings rather than a typed service or action result.
-5. **No cancel or pause protocol:** GUI commands are serialized and buttons are disabled while busy, but there is no ROS service/action for canceling, pausing, or emergency-stopping active motion.
-6. **Single-command execution:** active motion and drawing sequences reject new commands instead of buffering them. Shape sequencing still depends on the `/status_delta` handshake.
-7. **Prototype metadata:** the package version remains `0.0.0`, and the package manifest does not communicate a release maturity level.
-
-## Recommended Next Steps
-
-1. Add node-level integration tests for valid motion, unreachable paths, busy-command rejection, failure cleanup, and multi-segment shape completion.
-2. Replace the string topic handshake with a ROS 2 action for typed results, goal feedback, cancellation, timeout, and failure handling.
-3. Move ROS 1 camera and inactive C++ sources into a clearly named `legacy/` or separate package, or port them fully to ROS 2.
-4. Define the hardware architecture: motor controller, homing, joint limits, emergency stop, timing, and feedback before enabling physical motion.
-5. Add CI for build, test, lint, and optionally URDF validation; then assign a meaningful package version.
-
-## Documentation Guide
-
-- Start with `README.md` for build and usage commands.
-- Use this file for project scope, current status, and priorities.
-- Use `docs/software_architecture.md` for detailed component, topic, and sequence diagrams.
+Start with [README.md](README.md) for setup and commands, then use
+[docs/software_architecture.md](docs/software_architecture.md) for runtime
+details.
