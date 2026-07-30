@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <iterator>
 #include <memory>
@@ -13,10 +14,12 @@
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "std_msgs/msg/string.hpp"
 
+#include "cartesian_jog.hpp"
 #include "command_validation.hpp"
 #include "delta_robot.h"
 #include "joint_state_config.hpp"
 #include "motion_planner.hpp"
+#include "my_delta_robot/msg/cartesian_jog.hpp"
 #include "my_delta_robot/msg/circle_xyz.hpp"
 #include "my_delta_robot/msg/linear_speed_xyz.hpp"
 #include "my_delta_robot/msg/vmax_amax.hpp"
@@ -27,7 +30,9 @@ using SteadyClock = std::chrono::steady_clock;
 
 constexpr auto kMotionTick = std::chrono::milliseconds(1);
 constexpr auto kIdleStatePublishPeriod = std::chrono::milliseconds(200);
+constexpr auto kJogCommandTimeout = std::chrono::milliseconds(300);
 constexpr double kMotionSamplePeriodSec = 0.001;
+constexpr double kMaximumJogTickSec = 0.02;
 constexpr double kDefaultVelocityMmS = 5000.0;
 constexpr double kDefaultAccelerationMmS2 = 100.0;
 constexpr double kDeclaredStartToleranceM = 1e-4;
@@ -71,6 +76,9 @@ public:
             "input_ls_final", 10,
             std::bind(&MainNode::onSegmentCommand, this,
                       std::placeholders::_1));
+    jog_subscription_ = create_subscription<my_delta_robot::msg::CartesianJog>(
+        "input_cartesian_jog", 10,
+        std::bind(&MainNode::onJogCommand, this, std::placeholders::_1));
     circle_subscription_ = create_subscription<my_delta_robot::msg::CircleXYZ>(
         "input_circle", 10,
         std::bind(&MainNode::onCircleCommand, this, std::placeholders::_1));
@@ -179,6 +187,61 @@ private:
     startTrajectory(target_mm);
   }
 
+  void onJogCommand(const my_delta_robot::msg::CartesianJog::SharedPtr msg) {
+    if (msg->command == my_delta_robot::msg::CartesianJog::STOP) {
+      stopActiveJog("button released");
+      return;
+    }
+
+    Point direction;
+    std::string direction_name;
+    if (!decodeJogDirection(msg->command, direction, direction_name)) {
+      publishFailure("Unknown Cartesian jog direction");
+      return;
+    }
+    const double speed_mps = static_cast<double>(msg->speed_mm_s) * mmtm;
+    if (!std::isfinite(speed_mps) || speed_mps <= 0.0) {
+      publishFailure("Cartesian jog speed must be finite and positive");
+      return;
+    }
+    if (speed_mps > motion_limits_.max_velocity_mps) {
+      publishFailure("Cartesian jog speed exceeds the configured velocity "
+                     "limit");
+      return;
+    }
+
+    const auto command_time = SteadyClock::now();
+    if (jog_active_) {
+      if (msg->command != active_jog_command_) {
+        RCLCPP_WARN(get_logger(),
+                    "A different Cartesian jog direction is already active");
+        return;
+      }
+      requested_jog_speed_mps_ = speed_mps;
+      last_jog_command_at_ = command_time;
+      return;
+    }
+    if (motion_active_) {
+      RCLCPP_WARN(get_logger(),
+                  "Motion already active; Cartesian jog rejected");
+      return;
+    }
+
+    active_jog_command_ = msg->command;
+    jog_direction_ = direction;
+    requested_jog_speed_mps_ = speed_mps;
+    current_jog_speed_mps_ = 0.0;
+    last_jog_command_at_ = command_time;
+    last_jog_tick_at_ = command_time;
+    active_motion_description_ =
+        "jog " + direction_name + " at " +
+        std::to_string(static_cast<double>(msg->speed_mm_s)) + " mm/s";
+    jog_active_ = true;
+    motion_active_ = true;
+
+    RCLCPP_INFO(get_logger(), "Started %s", active_motion_description_.c_str());
+  }
+
   void onCircleCommand(const my_delta_robot::msg::CircleXYZ::SharedPtr msg) {
     if (motion_active_) {
       RCLCPP_WARN(get_logger(), "Motion already active; circle rejected");
@@ -285,7 +348,14 @@ private:
   }
 
   void onMotionTimer() {
-    if (!motion_active_ || active_samples_.empty()) {
+    if (!motion_active_) {
+      return;
+    }
+    if (jog_active_) {
+      updateActiveJog();
+      return;
+    }
+    if (active_samples_.empty()) {
       return;
     }
 
@@ -342,6 +412,105 @@ private:
     return true;
   }
 
+  bool decodeJogDirection(std::uint8_t command, Point &direction,
+                          std::string &name) const {
+    switch (command) {
+    case my_delta_robot::msg::CartesianJog::FORWARD:
+      direction = {0.0, 1.0, 0.0};
+      name = "forward (+Y)";
+      return true;
+    case my_delta_robot::msg::CartesianJog::BACK:
+      direction = {0.0, -1.0, 0.0};
+      name = "back (-Y)";
+      return true;
+    case my_delta_robot::msg::CartesianJog::LEFT:
+      direction = {-1.0, 0.0, 0.0};
+      name = "left (-X)";
+      return true;
+    case my_delta_robot::msg::CartesianJog::RIGHT:
+      direction = {1.0, 0.0, 0.0};
+      name = "right (+X)";
+      return true;
+    case my_delta_robot::msg::CartesianJog::UP:
+      direction = {0.0, 0.0, 1.0};
+      name = "up (+Z)";
+      return true;
+    case my_delta_robot::msg::CartesianJog::DOWN:
+      direction = {0.0, 0.0, -1.0};
+      name = "down (-Z)";
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  void updateActiveJog() {
+    const auto tick_time = SteadyClock::now();
+    if ((tick_time - last_jog_command_at_) > kJogCommandTimeout) {
+      publishFailure(
+          "Cartesian jog stopped because the UI heartbeat timed out");
+      publishStoppedProfile();
+      stopMotion();
+      return;
+    }
+
+    const double elapsed_s = std::min(
+        std::chrono::duration<double>(tick_time - last_jog_tick_at_).count(),
+        kMaximumJogTickSec);
+    last_jog_tick_at_ = tick_time;
+    if (elapsed_s <= 0.0) {
+      return;
+    }
+
+    const auto step = delta_motion::advanceJog(
+        current_tcp_m_, jog_direction_, current_jog_speed_mps_,
+        requested_jog_speed_mps_, motion_limits_.max_acceleration_mps2,
+        elapsed_s);
+    delta_motion::TrajectorySample sample;
+    sample.position_m = step.position_m;
+    sample.velocity_mps = {
+        jog_direction_.x * step.speed_mps,
+        jog_direction_.y * step.speed_mps,
+        jog_direction_.z * step.speed_mps,
+    };
+    sample.acceleration_mps2 = {
+        jog_direction_.x * step.acceleration_mps2,
+        jog_direction_.y * step.acceleration_mps2,
+        jog_direction_.z * step.acceleration_mps2,
+    };
+    sample.path_velocity_mps = step.speed_mps;
+    sample.path_acceleration_mps2 = step.acceleration_mps2;
+
+    if (!publishSample(sample)) {
+      publishFailure("Cartesian jog stopped at the workspace boundary");
+      publishStoppedProfile();
+      stopMotion();
+      return;
+    }
+    current_jog_speed_mps_ = step.speed_mps;
+  }
+
+  void stopActiveJog(const std::string &reason) {
+    if (!jog_active_) {
+      return;
+    }
+    const Point current_mm = metresToMillimetres(current_tcp_m_);
+    active_motion_description_ += " stopped (" + reason + ") at (" +
+                                  std::to_string(current_mm.x) + ", " +
+                                  std::to_string(current_mm.y) + ", " +
+                                  std::to_string(current_mm.z) + ") mm";
+    publishStoppedProfile();
+    publishSuccess();
+    stopMotion();
+  }
+
+  void publishStoppedProfile() {
+    my_delta_robot::msg::VmaxAmax profile;
+    profile.vmax = 0.0;
+    profile.amax = 0.0;
+    profile_publisher_->publish(profile);
+  }
+
   void publishSuccess() {
     std_msgs::msg::String status;
     status.data = "DONE " + active_motion_description_;
@@ -357,6 +526,11 @@ private:
 
   void stopMotion() {
     motion_active_ = false;
+    jog_active_ = false;
+    active_jog_command_ = my_delta_robot::msg::CartesianJog::STOP;
+    jog_direction_ = {};
+    requested_jog_speed_mps_ = 0.0;
+    current_jog_speed_mps_ = 0.0;
     active_samples_.clear();
     last_published_sample_index_ = 0;
   }
@@ -373,6 +547,13 @@ private:
   rclcpp::TimerBase::SharedPtr idle_state_timer_;
 
   bool motion_active_{false};
+  bool jog_active_{false};
+  std::uint8_t active_jog_command_{my_delta_robot::msg::CartesianJog::STOP};
+  Point jog_direction_;
+  double requested_jog_speed_mps_{0.0};
+  double current_jog_speed_mps_{0.0};
+  SteadyClock::time_point last_jog_command_at_{};
+  SteadyClock::time_point last_jog_tick_at_{};
   std::size_t last_published_sample_index_{0};
   SteadyClock::time_point motion_started_at_{};
   std::string active_motion_description_;
@@ -380,6 +561,8 @@ private:
 
   rclcpp::Subscription<my_delta_robot::msg::LinearSpeedXYZ>::SharedPtr
       segment_subscription_;
+  rclcpp::Subscription<my_delta_robot::msg::CartesianJog>::SharedPtr
+      jog_subscription_;
   rclcpp::Subscription<my_delta_robot::msg::CircleXYZ>::SharedPtr
       circle_subscription_;
   rclcpp::Subscription<my_delta_robot::msg::VmaxAmax>::SharedPtr

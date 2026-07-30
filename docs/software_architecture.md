@@ -18,6 +18,7 @@ flowchart LR
         LIMITS["/set_vmax_amax"]
         SHAPE["/set_current_point"]
         LINE["/input_ls_final"]
+        JOG["/input_cartesian_jog"]
         CIRCLE["/input_circle"]
     end
 
@@ -44,6 +45,7 @@ flowchart LR
     GUI --> LIMITS
     GUI --> SHAPE
     GUI --> LINE
+    GUI --> JOG
     TUI --> LIMITS
     TUI --> SHAPE
     CLI --> LIMITS
@@ -57,6 +59,7 @@ flowchart LR
     DRAW --> CIRCLE
     LIMITS --> MAIN
     LINE --> MAIN
+    JOG --> MAIN
     CIRCLE --> MAIN
     MAIN --> PLANNER
     MAIN --> IK
@@ -78,7 +81,7 @@ flowchart LR
 | Component | Responsibility |
 |---|---|
 | `bringup.launch.py` | Start the model, motion nodes, and optional UI/RViz processes |
-| `main_node` | Own current TCP state, validate commands, plan and preflight trajectories, publish samples and motion status |
+| `main_node` | Own current TCP state, execute planned trajectories and live Cartesian jogging, publish samples and motion status |
 | `draw_node` | Convert shape requests into a guarded sequence of line/circle commands |
 | trajectory planner | Generate bounded, time-stamped line and circle samples |
 | kinematics model | Compute checked inverse kinematics and mapped joint positions |
@@ -96,9 +99,39 @@ flowchart LR
   `LinearSpeedXYZ` remain for compatibility and diagnostics, but do not control
   the actual start of a new trajectory.
 - The home TCP is `(0, 0, -375 mm)` in `base_link`.
+- Cartesian jog commands use millimetres per second and must be refreshed more
+  often than the 300 ms dead-man timeout.
 
 Keeping state ownership in `main_node` prevents a delayed UI sample or arbitrary
 caller start from teleporting `/joint_states`.
+
+## Press-and-hold Cartesian jogging
+
+```mermaid
+sequenceDiagram
+    participant Operator
+    participant GUI
+    participant Main as main_node
+    participant State as /joint_states
+
+    Operator->>GUI: Press direction button
+    GUI->>Main: CartesianJog(direction, speed)
+    loop Every 100 ms while held
+        GUI->>Main: Refresh same jog command
+        Main->>Main: Accelerate and integrate next TCP sample
+        Main->>State: Publish checked joint state
+    end
+    Operator->>GUI: Release button
+    GUI->>Main: CartesianJog(STOP)
+    Main->>Main: Keep latest executed TCP
+    Main-->>GUI: DONE jog
+```
+
+`STOP` takes effect without planning a deceleration tail, so the simulation
+remains at its latest published position. If refresh messages stop because the
+UI closes or communication fails, `main_node` stops the jog after 300 ms.
+Every integrated position is checked through inverse kinematics before it is
+published; reaching the workspace boundary stops the jog with a failure status.
 
 ## Direct-line execution
 
@@ -204,9 +237,11 @@ discovery handle startup ordering without a hard-coded delay.
 
 `/status_delta` and `/drawing_status` are human-readable strings. They are
 adequate for the current single-command simulation UI, but they have no goal
-identifier, typed result, cancellation, or robust multi-client arbitration.
-The preferred next architecture is a ROS 2 action owned by `main_node`, with
-`draw_node` acting as an action client for multi-stage shapes.
+identifier, typed result, general trajectory cancellation, or robust
+multi-client arbitration. Cartesian jogging has a dedicated `STOP` command and
+dead-man timeout, but line and shape execution do not. The preferred next
+architecture is a ROS 2 action owned by `main_node`, with `draw_node` acting as
+an action client for multi-stage shapes.
 
 Unsupported ROS 1 camera and hardware experiments are isolated under
 [`src/legacy/`](../src/legacy/README.md) and are not part of this architecture.

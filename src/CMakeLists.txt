@@ -14,6 +14,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/CartesianJog.msg"
   "msg/CircleXYZ.msg"
   "msg/LinearSpeedXYZ.msg"
   "msg/Posicionxyz.msg"

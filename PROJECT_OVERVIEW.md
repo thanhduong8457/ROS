@@ -35,7 +35,7 @@ flowchart LR
     CORE["C++ core<br/>planner + IK + joint mapping"]
     MODEL["robot_state_publisher + RViz"]
 
-    UI -->|limits and direct targets| MAIN
+    UI -->|limits, direct targets, and live jog| MAIN
     UI -->|shape requests| DRAW
     DRAW -->|line or circle target| MAIN
     MAIN --> CORE
@@ -63,7 +63,9 @@ The canonical entry point is `bringup.launch.py`. `control.launch.py` and
 ## Main risks
 
 1. Motion completion uses uncorrelated string topics. A ROS 2 action would add
-   typed acceptance, feedback, goal IDs, cancellation, and multi-client safety.
+   typed acceptance, feedback, goal IDs, general trajectory cancellation, and
+   multi-client safety. Live Cartesian jogging already has an explicit stop
+   command and dead-man timeout.
 2. There is no supported physical-controller boundary or safety architecture.
 3. Runtime integration, launch, GUI, and URDF/TF behavior need broader
    automated coverage.

@@ -1,6 +1,7 @@
 /**
  * Unit test for delta_robot kinematics (inverse and trajectory).
  */
+#include "cartesian_jog.hpp"
 #include "command_validation.hpp"
 #include "delta_robot.h"
 #include "joint_state_config.hpp"
@@ -95,6 +96,38 @@ TEST(DeltaRobot, JointMappingRejectsNonFiniteInput) {
       robot.createJointStatePositions(Point(nan, 0.0, -0.4), Theta{}, joints));
   EXPECT_FALSE(robot.createJointStatePositions(Point(0.0, 0.0, -0.4),
                                                Theta{nan, 0.0, 0.0}, joints));
+}
+
+TEST(CartesianJog, AcceleratesAlongRequestedAxis) {
+  const Point start(0.01, 0.02, -0.4);
+  const auto step =
+      delta_motion::advanceJog(start, Point(0.0, 1.0, 0.0), 0.0, 0.1, 0.5, 0.1);
+
+  EXPECT_DOUBLE_EQ(step.position_m.x, start.x);
+  EXPECT_NEAR(step.position_m.y, 0.0225, 1e-12);
+  EXPECT_DOUBLE_EQ(step.position_m.z, start.z);
+  EXPECT_NEAR(step.speed_mps, 0.05, 1e-12);
+  EXPECT_NEAR(step.acceleration_mps2, 0.5, 1e-12);
+}
+
+TEST(CartesianJog, CapsSpeedAndMovesInNegativeDirection) {
+  const Point start(0.01, 0.02, -0.4);
+  const auto step = delta_motion::advanceJog(start, Point(-1.0, 0.0, 0.0), 0.09,
+                                             0.1, 0.5, 0.1);
+
+  EXPECT_NEAR(step.position_m.x, 0.0005, 1e-12);
+  EXPECT_DOUBLE_EQ(step.position_m.y, start.y);
+  EXPECT_NEAR(step.speed_mps, 0.1, 1e-12);
+  EXPECT_NEAR(step.acceleration_mps2, 0.1, 1e-12);
+}
+
+TEST(CartesianJog, RecognizesOnlySingleUnitAxisDirections) {
+  EXPECT_TRUE(delta_motion::isUnitAxisDirection(Point(1.0, 0.0, 0.0)));
+  EXPECT_TRUE(delta_motion::isUnitAxisDirection(Point(0.0, -1.0, 0.0)));
+  EXPECT_FALSE(delta_motion::isUnitAxisDirection(Point(0.0, 0.0, 0.0)));
+  EXPECT_FALSE(delta_motion::isUnitAxisDirection(Point(1.0, 1.0, 0.0)));
+  EXPECT_FALSE(delta_motion::isUnitAxisDirection(Point(1.0, 0.5, 0.0)));
+  EXPECT_FALSE(delta_motion::isUnitAxisDirection(Point(0.5, 0.0, 0.0)));
 }
 
 TEST(CartesianTrajectory, SamplesStraightLineWithTrapezoidState) {

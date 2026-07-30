@@ -75,11 +75,16 @@ The graphical panel provides:
 - connection and live TCP status;
 - motion-limit presets and editable velocity/acceleration;
 - rectangle, triangle, and continuous-circle commands;
-- direct Cartesian targets, home return, and incremental jogging;
+- direct Cartesian targets and home return;
+- a six-direction Cartesian joystick for Forward (`+Y`), Back (`-Y`),
+  Left (`-X`), Right (`+X`), Up (`+Z`), and Down (`-Z`) movement with
+  selectable 5–100 mm/s speed;
 - command progress and failure feedback.
 
-Motion commands execute immediately. The UI prevents overlapping commands but
-cannot pause, cancel, or emergency-stop active motion.
+Press and hold a joystick button to move, then release it to stop at the latest
+executed position. A 300 ms command-heartbeat timeout also stops jogging if the
+UI closes or communication is interrupted. Line and drawing commands still
+cannot be paused or cancelled, and the UI is not a hardware emergency stop.
 
 The terminal interface remains available:
 
@@ -105,9 +110,10 @@ The home TCP is `(0, 0, -375)` mm; negative Z points downward.
 | `/set_vmax_amax` | `VmaxAmax` | Set maximum path velocity and acceleration |
 | `/set_current_point` | `Posicionxyz` | Configure drawing state or request a shape |
 | `/input_ls_final` | `LinearSpeedXYZ` | Request a Cartesian line target |
+| `/input_cartesian_jog` | `CartesianJog` | Start, refresh, or stop press-and-hold jogging |
 | `/input_circle` | `CircleXYZ` | Request one continuous circle |
 | `/joint_states` | `sensor_msgs/JointState` | Publish modeled joints and live TCP |
-| `/status_delta` | `std_msgs/String` | Report line/circle completion or failure |
+| `/status_delta` | `std_msgs/String` | Report line, circle, or jog completion/failure |
 | `/drawing_status` | `std_msgs/String` | Report whole-shape progress |
 | `/v_a_out` | `VmaxAmax` | Publish the current path velocity/acceleration |
 
@@ -197,8 +203,9 @@ and are not source code.
 - Simulation output stops at `/joint_states`; no physical motor controller is
   connected.
 - Command completion still uses string topics rather than a typed ROS 2 action,
-  so goal IDs, feedback, cancellation, and robust multi-client arbitration are
-  future work.
+  so goal IDs, feedback, general trajectory cancellation, and robust
+  multi-client arbitration are future work. Cartesian jogging has its own
+  explicit stop command and dead-man timeout.
 - Shape geometry is currently defined by `draw_node`; the operator UI exposes
   shape selection but not arbitrary dimensions.
 - Node-level launch behavior, GUI widgets, and URDF/TF consistency have less

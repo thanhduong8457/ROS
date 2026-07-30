@@ -13,12 +13,19 @@ from tkinter import messagebox, ttk
 from ros_bootstrap import prepare_ros_python_environment
 from ui_config import (
     DEFAULT_AMAX,
+    DEFAULT_JOG_SPEED_MM_S,
     DEFAULT_VMAX,
     HOME_TCP_MM,
+    JOG_DIRECTIONS,
+    JOG_HEARTBEAT_PERIOD_MS,
+    JOG_SPEED_OPTIONS_MM_S,
     JOINT_STATE_TIMEOUT_SEC,
     MAX_Z_MM,
+    MIN_UI_VIEWPORT_SIZE,
     MIN_Z_MM,
     SHAPES_BY_KEY,
+    fit_ui_window_size,
+    jog_message_command,
     shape_message_type,
 )
 
@@ -29,7 +36,12 @@ from rclpy.node import Node  # noqa: E402
 from sensor_msgs.msg import JointState  # noqa: E402
 from std_msgs.msg import String  # noqa: E402
 
-from my_delta_robot.msg import LinearSpeedXYZ, Posicionxyz, VmaxAmax  # noqa: E402
+from my_delta_robot.msg import (  # noqa: E402
+    CartesianJog,
+    LinearSpeedXYZ,
+    Posicionxyz,
+    VmaxAmax,
+)
 
 
 class RobotControlNode(Node):
@@ -40,6 +52,9 @@ class RobotControlNode(Node):
         self.motion_limits_pub = self.create_publisher(VmaxAmax, "set_vmax_amax", 10)
         self.shape_pub = self.create_publisher(Posicionxyz, "set_current_point", 10)
         self.segment_pub = self.create_publisher(LinearSpeedXYZ, "input_ls_final", 10)
+        self.jog_pub = self.create_publisher(
+            CartesianJog, "input_cartesian_jog", 10
+        )
         self.create_subscription(JointState, "joint_states", self._on_joint_state, 10)
         self.create_subscription(String, "status_delta", self._on_motion_status, 10)
         self.create_subscription(String, "drawing_status", self._on_drawing_status, 10)
@@ -70,6 +85,12 @@ class RobotControlNode(Node):
         if self.active_command == "manual":
             if is_done and self.pending_manual_target is not None:
                 self._publish_draw_current_point(self.pending_manual_target)
+            self.reset_command_tracking()
+            level = "error" if is_failed else "success"
+            self.events.append((level, msg.data))
+        elif (self.active_command or "").startswith("jog:"):
+            if is_done:
+                self._publish_draw_current_point(self.tcp_mm)
             self.reset_command_tracking()
             level = "error" if is_failed else "success"
             self.events.append((level, msg.data))
@@ -116,6 +137,8 @@ class RobotControlNode(Node):
         if self.shape_pub.get_subscription_count() == 0:
             missing.append("draw_node")
         if self.segment_pub.get_subscription_count() == 0 and "main_node" not in missing:
+            missing.append("main_node")
+        if self.jog_pub.get_subscription_count() == 0 and "main_node" not in missing:
             missing.append("main_node")
         if missing:
             return False, "Waiting for " + ", ".join(dict.fromkeys(missing))
@@ -189,17 +212,112 @@ class RobotControlNode(Node):
             )
         )
 
+    def publish_jog(self, direction_key: str, speed_mm_s: float) -> None:
+        direction = JOG_DIRECTIONS[direction_key]
+        msg = CartesianJog()
+        msg.command = jog_message_command(direction, CartesianJog)
+        msg.speed_mm_s = speed_mm_s
+        self.jog_pub.publish(msg)
+
+    def publish_jog_stop(self) -> None:
+        msg = CartesianJog()
+        msg.command = CartesianJog.STOP
+        msg.speed_mm_s = 0.0
+        self.jog_pub.publish(msg)
+
     def drain_events(self) -> list[tuple[str, str]]:
         events, self.events = self.events, []
         return events
 
 
+class AutoHideScrollbar(ttk.Scrollbar):
+    """Scrollbar that stays out of the layout until its canvas can scroll."""
+
+    def set(self, first: str, last: str) -> None:
+        if float(first) <= 0.0 and float(last) >= 1.0:
+            self.grid_remove()
+        else:
+            self.grid()
+        super().set(first, last)
+
+
+class ScrollableControlArea(ttk.Frame):
+    """Viewport that keeps the complete control panel reachable on small screens."""
+
+    def __init__(self, parent: tk.Tk, node: RobotControlNode) -> None:
+        super().__init__(parent)
+        self.grid(row=0, column=0, sticky="nsew")
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+
+        self.canvas = tk.Canvas(
+            self,
+            highlightthickness=0,
+            background=parent.cget("background"),
+        )
+        vertical = AutoHideScrollbar(
+            self, orient="vertical", command=self.canvas.yview
+        )
+        horizontal = AutoHideScrollbar(
+            self, orient="horizontal", command=self.canvas.xview
+        )
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        vertical.grid(row=0, column=1, sticky="ns")
+        horizontal.grid(row=1, column=0, sticky="ew")
+        self.canvas.configure(
+            yscrollcommand=vertical.set,
+            xscrollcommand=horizontal.set,
+        )
+
+        self.app = RobotControlApp(self.canvas, node)
+        self.content_window = self.canvas.create_window(
+            (0, 0), window=self.app, anchor="nw"
+        )
+        self.app.bind("<Configure>", self._update_scroll_region)
+        self.canvas.bind("<Configure>", self._resize_content)
+        parent.bind("<MouseWheel>", self._scroll_vertical, add="+")
+        parent.bind("<Button-4>", self._scroll_vertical, add="+")
+        parent.bind("<Button-5>", self._scroll_vertical, add="+")
+        parent.bind("<Shift-MouseWheel>", self._scroll_horizontal, add="+")
+
+    def _update_scroll_region(self, _event: tk.Event) -> None:
+        bounds = self.canvas.bbox(self.content_window)
+        if bounds is not None:
+            self.canvas.configure(scrollregion=bounds)
+
+    def _resize_content(self, event: tk.Event) -> None:
+        content_width = max(event.width, self.app.winfo_reqwidth())
+        self.canvas.itemconfigure(self.content_window, width=content_width)
+
+    @staticmethod
+    def _wheel_units(event: tk.Event) -> int:
+        if getattr(event, "num", None) == 4:
+            return -1
+        if getattr(event, "num", None) == 5:
+            return 1
+        return -1 if getattr(event, "delta", 0) > 0 else 1
+
+    def _scroll_vertical(self, event: tk.Event) -> str | None:
+        first, last = self.canvas.yview()
+        if first <= 0.0 and last >= 1.0:
+            return None
+        self.canvas.yview_scroll(self._wheel_units(event), "units")
+        return "break"
+
+    def _scroll_horizontal(self, event: tk.Event) -> str | None:
+        first, last = self.canvas.xview()
+        if first <= 0.0 and last >= 1.0:
+            return None
+        self.canvas.xview_scroll(self._wheel_units(event), "units")
+        return "break"
+
+
 class RobotControlApp(ttk.Frame):
     """Control panel for shape drawing and direct Cartesian positioning."""
 
-    def __init__(self, root: tk.Tk, node: RobotControlNode) -> None:
-        super().__init__(root, padding=18)
-        self.root = root
+    def __init__(self, parent: tk.Misc, node: RobotControlNode) -> None:
+        super().__init__(parent, padding=18)
+        self.root = parent.winfo_toplevel()
         self.node = node
         self.vmax_var = tk.StringVar(value=DEFAULT_VMAX)
         self.amax_var = tk.StringVar(value=DEFAULT_AMAX)
@@ -207,13 +325,12 @@ class RobotControlApp(ttk.Frame):
         self.activity_var = tk.StringVar(value="Ready")
         self.position_vars = [tk.StringVar(value="--.-") for _ in range(3)]
         self.target_vars = [tk.StringVar(value=f"{value:.1f}") for value in HOME_TCP_MM]
-        self.jog_step_var = tk.StringVar(value="5")
+        self.jog_speed_var = tk.StringVar(value=DEFAULT_JOG_SPEED_MM_S)
+        self.active_jog_direction: str | None = None
         self.command_buttons: list[ttk.Button] = []
         self.manual_buttons: list[ttk.Button] = []
+        self.jog_buttons: dict[str, ttk.Button] = {}
 
-        self.grid(row=0, column=0, sticky="nsew")
-        root.columnconfigure(0, weight=1)
-        root.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(2, weight=1)
 
@@ -222,6 +339,9 @@ class RobotControlApp(ttk.Frame):
         self._build_limits()
         self._build_control_tabs()
         self._build_activity_log()
+        self.root.bind_all(
+            "<ButtonRelease-1>", self._on_pointer_release, add="+"
+        )
         self._schedule_ros_spin()
         self._refresh_ui()
 
@@ -233,6 +353,11 @@ class RobotControlApp(ttk.Frame):
         style.configure("Connected.TLabel", foreground="#16803a")
         style.configure("Disconnected.TLabel", foreground="#b54708")
         style.configure("Primary.TButton", font=("TkDefaultFont", 11, "bold"), padding=10)
+        style.configure(
+            "Joystick.TButton",
+            font=("TkDefaultFont", 10, "bold"),
+            padding=(12, 9),
+        )
 
     def _build_header(self) -> None:
         header = ttk.Frame(self)
@@ -361,35 +486,88 @@ class RobotControlApp(ttk.Frame):
         self.command_buttons.extend((move_button, home_button))
         self.manual_buttons.extend((copy_button, move_button, home_button))
 
-        jog = ttk.LabelFrame(tab, text="Incremental Jog", padding=12)
+        jog = ttk.LabelFrame(tab, text="Cartesian Joystick", padding=12)
         jog.grid(row=1, column=0, columnspan=2, sticky="ew")
-        ttk.Label(jog, text="Step (mm)").grid(row=0, column=0, sticky="w")
+        ttk.Label(jog, text="Jog speed (mm/s)").grid(
+            row=0, column=0, sticky="w"
+        )
         ttk.Combobox(
             jog,
-            textvariable=self.jog_step_var,
-            values=("1", "2", "5", "10", "20"),
+            textvariable=self.jog_speed_var,
+            values=JOG_SPEED_OPTIONS_MM_S,
             state="readonly",
             width=7,
         ).grid(row=0, column=1, sticky="w", padx=(8, 20))
-        ttk.Label(jog, text=f"Z workspace: {MIN_Z_MM:g} to {MAX_Z_MM:g} mm").grid(
-            row=0, column=2, columnspan=4, sticky="w"
+        ttk.Label(
+            jog,
+            text=(
+                "Press and hold to move; release to stop • "
+                f"Z workspace: {MIN_Z_MM:g} to {MAX_Z_MM:g} mm"
+            ),
+        ).grid(
+            row=0, column=2, sticky="w"
         )
+        jog.columnconfigure(2, weight=1)
 
-        controls = (
-            ("X −", 0, -1), ("X +", 0, 1),
-            ("Y −", 1, -1), ("Y +", 1, 1),
-            ("Z Down", 2, -1), ("Z Up", 2, 1),
+        xy_pad = ttk.LabelFrame(jog, text="Horizontal Plane (X / Y)", padding=8)
+        xy_pad.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
+        for column in range(3):
+            xy_pad.columnconfigure(column, weight=1)
+        xy_controls = (
+            ("forward", 0, 1, "↑ Forward\n(+Y)"),
+            ("left", 1, 0, "← Left\n(−X)"),
+            ("right", 1, 2, "Right →\n(+X)"),
+            ("back", 2, 1, "↓ Back\n(−Y)"),
         )
-        for column, (label, axis, direction) in enumerate(controls):
+        for direction_key, row, column, label in xy_controls:
             button = ttk.Button(
-                jog,
+                xy_pad,
                 text=label,
-                command=lambda a=axis, d=direction: self._jog(a, d),
+                style="Joystick.TButton",
             )
-            button.grid(row=1, column=column, sticky="ew", padx=3, pady=(10, 0))
-            jog.columnconfigure(column, weight=1)
+            button.bind(
+                "<ButtonPress-1>",
+                lambda _event, key=direction_key: self._start_jog(key),
+            )
+            button.grid(row=row, column=column, sticky="nsew", padx=4, pady=4)
+            self.jog_buttons[direction_key] = button
             self.command_buttons.append(button)
             self.manual_buttons.append(button)
+        ttk.Label(
+            xy_pad,
+            text="TCP\nX / Y",
+            anchor="center",
+            justify="center",
+            style="Section.TLabel",
+        ).grid(row=1, column=1, sticky="nsew", padx=4, pady=4)
+
+        z_pad = ttk.LabelFrame(jog, text="Vertical Axis (Z)", padding=8)
+        z_pad.grid(row=1, column=2, sticky="nsew", padx=(12, 0), pady=(10, 0))
+        z_pad.columnconfigure(0, weight=1)
+        for row, direction_key, label in (
+            (0, "up", "↑ Up\n(+Z)"),
+            (2, "down", "↓ Down\n(−Z)"),
+        ):
+            button = ttk.Button(
+                z_pad,
+                text=label,
+                style="Joystick.TButton",
+            )
+            button.bind(
+                "<ButtonPress-1>",
+                lambda _event, key=direction_key: self._start_jog(key),
+            )
+            button.grid(row=row, column=0, sticky="nsew", padx=4, pady=4)
+            self.jog_buttons[direction_key] = button
+            self.command_buttons.append(button)
+            self.manual_buttons.append(button)
+        ttk.Label(
+            z_pad,
+            text="End Effector\nHeight",
+            anchor="center",
+            justify="center",
+            style="Section.TLabel",
+        ).grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
 
     def _build_activity_log(self) -> None:
         frame = ttk.LabelFrame(self, text="Activity", padding=8)
@@ -440,15 +618,25 @@ class RobotControlApp(ttk.Frame):
             self._append_log(level, message)
             self.activity_var.set(message)
 
+        if self.active_jog_direction is not None and not (
+            self.node.active_command or ""
+        ).startswith("jog:"):
+            self.active_jog_direction = None
+
         busy = self.node.active_command is not None
+        jogging = (self.node.active_command or "").startswith("jog:")
         for button in self.command_buttons:
             button.configure(state="disabled" if busy else "normal")
         for button in self.manual_buttons:
             button.configure(
                 state="normal" if position_fresh and not busy else "disabled"
             )
-        self.recovery_button.configure(state="normal" if busy else "disabled")
-        if busy and not self.activity_var.get().startswith("Busy"):
+        if jogging and self.active_jog_direction is not None:
+            self.jog_buttons[self.active_jog_direction].configure(state="normal")
+        self.recovery_button.configure(
+            state="normal" if busy and not jogging else "disabled"
+        )
+        if busy and not jogging and not self.activity_var.get().startswith("Busy"):
             self.activity_var.set("Busy — waiting for motion completion")
 
         self.root.after(100, self._refresh_ui)
@@ -560,7 +748,9 @@ class RobotControlApp(ttk.Frame):
     def _dispatch_move(self, target: tuple[float, float, float]) -> None:
         self.node.publish_move(target)
 
-    def _move_to_target(self) -> None:
+    def _move_to_target(
+        self, activity_message: str = "Sending Cartesian move..."
+    ) -> None:
         target = self._target_values()
         if (
             target is None
@@ -575,7 +765,7 @@ class RobotControlApp(ttk.Frame):
             messagebox.showinfo("Already at target", "The robot is already at this position.")
             return
         self.node.begin_command("manual", target)
-        self.activity_var.set("Sending Cartesian move...")
+        self.activity_var.set(activity_message)
         self.root.after(150, lambda: self._dispatch_move(target))
 
     def _copy_current_to_target(self) -> None:
@@ -596,22 +786,72 @@ class RobotControlApp(ttk.Frame):
             variable.set(f"{value:.1f}")
         self._move_to_target()
 
-    def _jog(self, axis: int, direction: int) -> None:
-        if not self.node.has_fresh_joint_state():
-            messagebox.showwarning(
-                "Position unavailable",
-                (
-                    f"Cannot jog because the {self.node.joint_state_description()}. "
-                    "Wait for fresh /joint_states data."
-                ),
+    def _read_jog_speed(self) -> float | None:
+        try:
+            speed = float(self.jog_speed_var.get())
+        except ValueError:
+            messagebox.showerror("Invalid jog speed", "Jog speed must be a number.")
+            return None
+        if not math.isfinite(speed) or speed <= 0.0:
+            messagebox.showerror(
+                "Invalid jog speed", "Jog speed must be finite and positive."
             )
+            return None
+        return speed
+
+    def _start_jog(self, direction_key: str) -> None:
+        if self.active_jog_direction is not None:
             return
-        step = float(self.jog_step_var.get())
-        target = list(self.node.tcp_mm)
-        target[axis] += direction * step
-        for variable, value in zip(self.target_vars, target):
+        speed = self._read_jog_speed()
+        if (
+            speed is None
+            or not self._confirm_ready(require_fresh_position=True)
+            or not self._apply_limits(announce=False)
+        ):
+            return
+        direction = JOG_DIRECTIONS[direction_key]
+        self.active_jog_direction = direction_key
+        self.node.begin_command(f"jog:{direction_key}")
+        self.node.publish_jog(direction_key, speed)
+        self.activity_var.set(
+            f"Jogging {direction.label.lower()} ({direction.coordinate}) "
+            "— release button to stop"
+        )
+        self.root.after(JOG_HEARTBEAT_PERIOD_MS, self._send_jog_heartbeat)
+
+    def _send_jog_heartbeat(self) -> None:
+        direction_key = self.active_jog_direction
+        if direction_key is None:
+            return
+        if self.node.active_command != f"jog:{direction_key}":
+            self.active_jog_direction = None
+            return
+        speed = self._read_jog_speed()
+        if speed is None:
+            self._stop_jog()
+            return
+        self.node.publish_jog(direction_key, speed)
+        self.root.after(JOG_HEARTBEAT_PERIOD_MS, self._send_jog_heartbeat)
+
+    def _on_pointer_release(self, _event: tk.Event) -> None:
+        self._stop_jog()
+
+    def _stop_jog(self) -> None:
+        direction_key = self.active_jog_direction
+        if direction_key is None:
+            return
+        self.active_jog_direction = None
+        self.node.publish_jog_stop()
+        for variable, value in zip(self.target_vars, self.node.tcp_mm):
             variable.set(f"{value:.2f}")
-        self._move_to_target()
+        direction = JOG_DIRECTIONS[direction_key]
+        self.activity_var.set(
+            f"Stopping {direction.label.lower()} jog at the current position..."
+        )
+
+    def stop_jog_before_shutdown(self) -> None:
+        """Send an explicit stop; main_node's heartbeat timeout is the fallback."""
+        self._stop_jog()
 
     def _recover_ui_lock(self) -> None:
         if self.node.active_command is None:
@@ -638,13 +878,31 @@ def main() -> int:
     node = RobotControlNode()
     root = tk.Tk()
     root.title("Delta Robot Control")
-    root.geometry("820x700")
-    root.minsize(760, 640)
-    RobotControlApp(root, node)
-    root.protocol("WM_DELETE_WINDOW", root.destroy)
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    window_width, window_height = fit_ui_window_size(screen_width, screen_height)
+    offset_x = max(0, (screen_width - window_width) // 2)
+    offset_y = max(0, (screen_height - window_height) // 2)
+    root.geometry(
+        f"{window_width}x{window_height}+{offset_x}+{offset_y}"
+    )
+    root.minsize(
+        min(MIN_UI_VIEWPORT_SIZE[0], window_width),
+        min(MIN_UI_VIEWPORT_SIZE[1], window_height),
+    )
+    root.columnconfigure(0, weight=1)
+    root.rowconfigure(0, weight=1)
+    controls = ScrollableControlArea(root, node)
+    app = controls.app
+
+    def close_window() -> None:
+        app.stop_jog_before_shutdown()
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", close_window)
 
     def close_from_signal(_signum: int, _frame: object) -> None:
-        root.after_idle(root.destroy)
+        root.after_idle(close_window)
 
     signal.signal(signal.SIGINT, close_from_signal)
     signal.signal(signal.SIGTERM, close_from_signal)
