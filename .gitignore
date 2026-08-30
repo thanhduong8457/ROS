@@ -33,3 +33,11 @@
 *.exe
 *.out
 *.app
+.DS_Store
+build/
+install/
+log/
+
+# Generated URDF / Graphviz
+src/urdf/*.gv
+src/urdf/*.pdf
